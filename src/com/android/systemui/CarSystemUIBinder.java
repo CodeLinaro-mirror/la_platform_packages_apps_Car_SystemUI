@@ -17,9 +17,10 @@
 package com.android.systemui;
 
 import com.android.systemui.biometrics.AuthController;
-import com.android.systemui.car.navigationbar.CarNavigationBar;
+import com.android.systemui.car.systembar.CarSystemBar;
 import com.android.systemui.car.notification.CarNotificationModule;
 import com.android.systemui.car.sideloaded.SideLoadedAppController;
+import com.android.systemui.car.toast.CarToastUI;
 import com.android.systemui.car.voicerecognition.ConnectedDeviceVoiceRecognitionNotifier;
 import com.android.systemui.car.volume.VolumeUI;
 import com.android.systemui.car.window.OverlayWindowModule;
@@ -36,7 +37,6 @@ import com.android.systemui.statusbar.notification.InstantAppNotifier;
 import com.android.systemui.statusbar.notification.dagger.NotificationsModule;
 import com.android.systemui.statusbar.phone.StatusBar;
 import com.android.systemui.theme.ThemeOverlayController;
-import com.android.systemui.toast.ToastUI;
 import com.android.systemui.util.leak.GarbageMonitor;
 import com.android.systemui.wmshell.WMShell;
 
@@ -58,8 +58,8 @@ public abstract class CarSystemUIBinder {
     /** Inject Car Navigation Bar. */
     @Binds
     @IntoMap
-    @ClassKey(CarNavigationBar.class)
-    public abstract SystemUI bindCarNavigationBar(CarNavigationBar sysui);
+    @ClassKey(CarSystemBar.class)
+    public abstract SystemUI bindCarSystemBar(CarSystemBar sysui);
 
     /** Inject into GarbageMonitor.Service. */
     @Binds
@@ -146,11 +146,11 @@ public abstract class CarSystemUIBinder {
     @ClassKey(VolumeUI.class)
     public abstract SystemUI bindVolumeUI(VolumeUI sysui);
 
-    /** Inject into ToastUI. */
+    /** Inject into CarToastUI. */
     @Binds
     @IntoMap
-    @ClassKey(ToastUI.class)
-    public abstract SystemUI bindToastUI(ToastUI service);
+    @ClassKey(CarToastUI.class)
+    public abstract SystemUI bindCarToastUI(CarToastUI service);
 
     /** Inject into ConnectedDeviceVoiceRecognitionNotifier. */
     @Binds
