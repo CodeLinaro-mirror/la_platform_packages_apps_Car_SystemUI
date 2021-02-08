@@ -16,16 +16,19 @@
 
 package com.android.systemui.car.rvc;
 
+import static com.android.systemui.car.rvc.RearViewCameraViewController.CLOSE_SYSTEM_DIALOG_REASON_KEY;
+import static com.android.systemui.car.rvc.RearViewCameraViewController.CLOSE_SYSTEM_DIALOG_REASON_VALUE;
+
 import static com.google.common.truth.Truth.assertThat;
 
-import static org.mockito.Mockito.verify;
-
-import android.app.ActivityView;
+import android.app.ActivityOptions;
+import android.app.ActivityTaskManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.testing.TestableLooper;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
+import android.window.DisplayAreaOrganizer;
 
 import androidx.test.filters.SmallTest;
 
@@ -36,32 +39,49 @@ import com.android.systemui.car.window.OverlayViewGlobalStateController;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 @CarSystemUiTest
 @RunWith(MockitoJUnitRunner.class)
 @TestableLooper.RunWithLooper
 @SmallTest
 public class RearViewCameraViewControllerTest extends SysuiTestCase {
+    private static final long DEFAULT_TIMEOUT_MS = 2_000;
     private static final String TEST_ACTIVITY_NAME = "testPackage/testActivity";
+
     private RearViewCameraViewController mRearViewCameraViewController;
 
     @Mock
     private OverlayViewGlobalStateController mOverlayViewGlobalStateController;
-    @Mock
-    private ActivityView mMockActivityView;
-    @Captor
-    private ArgumentCaptor<Intent> mIntentCaptor;
+
+    private BlockingQueue<Intent> mCapturedIntents = new ArrayBlockingQueue<>(2);
 
     private void setUpRearViewCameraViewController(String testActivityName) {
         mContext.getOrCreateTestableResources().addOverride(
                 R.string.config_rearViewCameraActivity, testActivityName);
         mRearViewCameraViewController = new RearViewCameraViewController(
+                mContext,
                 mContext.getOrCreateTestableResources().getResources(),
-                mOverlayViewGlobalStateController);
+                mOverlayViewGlobalStateController,
+                ActivityTaskManager.getInstance(),
+                new DisplayAreaOrganizer(mContext.getMainExecutor())) {
+
+            @Override
+            void startRearViewCameraActivity(ActivityOptions unusedActivityOptions, Intent intent) {
+                mCapturedIntents.offer(intent);
+            }
+
+            @Override
+            void broadcastIntent(Intent intent) {
+                mCapturedIntents.offer(intent);
+            }
+        };
+
         mRearViewCameraViewController.inflate((ViewGroup) LayoutInflater.from(mContext).inflate(
                 R.layout.sysui_overlay_window, /* root= */ null));
     }
@@ -81,15 +101,28 @@ public class RearViewCameraViewControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void testShowInternal() {
+    public void testShowInternal() throws InterruptedException {
         setUpRearViewCameraViewController(TEST_ACTIVITY_NAME);
         assertThat(mRearViewCameraViewController.isShown()).isFalse();
-        assertThat(mRearViewCameraViewController.mActivityView).isNull();
+        assertThat(mRearViewCameraViewController.mView).isNull();
 
         mRearViewCameraViewController.showInternal();
+        mRearViewCameraViewController.mRvcView.getViewTreeObserver().dispatchOnGlobalLayout();
 
         assertThat(mRearViewCameraViewController.isShown()).isTrue();
-        assertThat(mRearViewCameraViewController.mActivityView).isNotNull();
+        assertThat(mRearViewCameraViewController.mView).isNotNull();
+
+        // Assert broadcast event
+        Intent closeSystemDialogsIntent = mCapturedIntents.poll(2, TimeUnit.SECONDS);
+        assertThat(closeSystemDialogsIntent.getAction()).isEqualTo(
+                Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
+        assertThat(closeSystemDialogsIntent.getStringExtra(
+                CLOSE_SYSTEM_DIALOG_REASON_KEY)).isEqualTo(CLOSE_SYSTEM_DIALOG_REASON_VALUE);
+
+        // Assert intent to create RVC view was fired
+        Intent rearViewCameraIntent = mCapturedIntents.poll(2, TimeUnit.SECONDS);
+        ComponentName expectedComponent = ComponentName.unflattenFromString(TEST_ACTIVITY_NAME);
+        assertThat(rearViewCameraIntent.getComponent()).isEqualTo(expectedComponent);
     }
 
     @Test
@@ -102,16 +135,6 @@ public class RearViewCameraViewControllerTest extends SysuiTestCase {
         mRearViewCameraViewController.hideInternal();
 
         assertThat(mRearViewCameraViewController.isShown()).isFalse();
-        assertThat(mRearViewCameraViewController.mActivityView).isNull();
-    }
-
-    @Test
-    public void testOnActivityViewReady_fireIntent() {
-        setUpRearViewCameraViewController(TEST_ACTIVITY_NAME);
-        mRearViewCameraViewController.mActivityViewCallback.onActivityViewReady(mMockActivityView);
-
-        verify(mMockActivityView).startActivity(mIntentCaptor.capture());
-        ComponentName expectedComponent = ComponentName.unflattenFromString(TEST_ACTIVITY_NAME);
-        assertThat(mIntentCaptor.getValue().getComponent()).isEqualTo(expectedComponent);
+        assertThat(mRearViewCameraViewController.mView).isNull();
     }
 }
