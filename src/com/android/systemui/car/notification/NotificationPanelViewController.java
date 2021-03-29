@@ -180,6 +180,10 @@ public class NotificationPanelViewController extends OverlayPanelViewController
                 R.bool.config_notif_panel_inset_by_left_systembar);
         mFitRightSystemBarInset = mResources.getBoolean(
                 R.bool.config_notif_panel_inset_by_right_systembar);
+
+        // Inflate view on instantiation to properly initialize listeners even if panel has
+        // not been opened.
+        getOverlayViewGlobalStateController().inflateView(this);
     }
 
     // CommandQueue.Callbacks
@@ -218,6 +222,11 @@ public class NotificationPanelViewController extends OverlayPanelViewController
     protected void hideInternal() {
         super.hideInternal();
         mNotificationVisibilityLogger.stop();
+    }
+
+    @Override
+    protected int getFocusAreaViewId() {
+        return R.id.notification_container;
     }
 
     @Override
@@ -266,6 +275,9 @@ public class NotificationPanelViewController extends OverlayPanelViewController
 
     /** Reinflates the view. */
     public void reinflate() {
+	// Do not reinflate the view if it has not been inflated at all.
+        if (!isInflated()) return;
+
         ViewGroup container = (ViewGroup) getLayout();
         container.removeView(mNotificationView);
 
