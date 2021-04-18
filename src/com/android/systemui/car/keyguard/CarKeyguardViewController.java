@@ -111,7 +111,12 @@ public class CarKeyguardViewController extends OverlayViewController implements
     }
 
     @Override
-    protected boolean shouldShowSystemBarInsets() {
+    protected int getFocusAreaViewId() {
+        return R.id.keyguard_container;
+    }
+
+    @Override
+    protected boolean shouldShowNavigationBarInsets() {
         return true;
     }
 
