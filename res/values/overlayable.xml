@@ -31,7 +31,6 @@ REGENERATE USING packages/apps/Car/tests/tools/rro/generate-overlayable.py
       <item type="anim" name="car_user_switcher_open_pod_animation"/>
       <item type="array" name="config_allowedAppInstallSources"/>
       <item type="array" name="config_carSystemUIOverlayViewsMediators"/>
-      <item type="array" name="config_restrictedToastsPackageNameAllowList"/>
       <item type="array" name="config_statusBarIconsToExclude"/>
       <item type="array" name="config_systemUIServiceComponentsExclude"/>
       <item type="array" name="config_systemUIServiceComponentsInclude"/>
@@ -265,8 +264,6 @@ REGENERATE USING packages/apps/Car/tests/tools/rro/generate-overlayable.py
       <item type="id" name="connected_device_signals_stub"/>
       <item type="id" name="dark_icon"/>
       <item type="id" name="driver_hvac"/>
-      <item type="id" name="empty_notification_text"/>
-      <item type="id" name="focus_view"/>
       <item type="id" name="fullscreen_user_switcher_stub"/>
       <item type="id" name="glass_pane"/>
       <item type="id" name="grid"/>
@@ -284,7 +281,6 @@ REGENERATE USING packages/apps/Car/tests/tools/rro/generate-overlayable.py
       <item type="id" name="light_icon"/>
       <item type="id" name="light_muted_icon"/>
       <item type="id" name="lock_screen_nav_buttons"/>
-      <item type="id" name="manage_button"/>
       <item type="id" name="max_width_guideline"/>
       <item type="id" name="nav_buttons"/>
       <item type="id" name="note"/>
@@ -375,7 +371,6 @@ REGENERATE USING packages/apps/Car/tests/tools/rro/generate-overlayable.py
       <item type="string" name="car_loading_profile"/>
       <item type="string" name="car_loading_profile_developer_message"/>
       <item type="string" name="car_new_user"/>
-      <item type="string" name="config_appGridComponentName"/>
       <item type="string" name="config_notificationPanelViewMediator"/>
       <item type="string" name="config_rearViewCameraActivity"/>
       <item type="string" name="config_statusBarComponent"/>

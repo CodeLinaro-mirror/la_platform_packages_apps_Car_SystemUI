@@ -22,8 +22,6 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.SystemUIModule;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 
-import java.util.Optional;
-
 import dagger.BindsInstance;
 import dagger.Subcomponent;
 
@@ -45,7 +43,7 @@ public interface CarSysUIComponent extends SysUIComponent {
     @Subcomponent.Builder
     interface Builder extends SysUIComponent.Builder {
         @BindsInstance
-        Builder setRootTaskDisplayAreaOrganizer(Optional<RootTaskDisplayAreaOrganizer> r);
+        Builder setRootTaskDisplayAreaOrganizer(RootTaskDisplayAreaOrganizer r);
 
         CarSysUIComponent build();
     }

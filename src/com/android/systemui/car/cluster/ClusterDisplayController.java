@@ -36,7 +36,6 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 
-import java.util.Optional;
 import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
@@ -58,22 +57,16 @@ public class ClusterDisplayController extends SystemUI {
     private ClusterState mClusterState;
 
     @Inject
-    public ClusterDisplayController(Context context,
-            Optional<RootTaskDisplayAreaOrganizer> rootTDAOrganizer,
+    public ClusterDisplayController(Context context, RootTaskDisplayAreaOrganizer rootTDAOrganizer,
             CarServiceProvider carServiceProvider, @Main Executor mainExecutor) {
         super(context);
-        mRootTDAOrganizer = rootTDAOrganizer.orElse(null);
+        mRootTDAOrganizer = rootTDAOrganizer;
         mCarServiceProvider = carServiceProvider;
         mMainExecutor = mainExecutor;
     }
 
     @Override
     public void start() {
-        if (mRootTDAOrganizer == null) {
-            Slog.w(TAG, "ClusterDisplayController is disabled because of no "
-                    + "RootTaskDisplayAreaOrganizer");
-            return;
-        }
         mCarServiceProvider.addListener(mCarServiceOnConnectedListener);
     }
 

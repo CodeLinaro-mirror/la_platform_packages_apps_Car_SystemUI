@@ -18,7 +18,6 @@ package com.android.systemui;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.os.UserHandle;
 
 import com.android.systemui.dagger.GlobalRootComponent;
 import com.android.systemui.dagger.SysUIComponent;
@@ -26,18 +25,15 @@ import com.android.systemui.dagger.WMComponent;
 import com.android.systemui.wmshell.CarWMComponent;
 
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 
 /**
  * Class factory to provide car specific SystemUI components.
  */
 public class CarSystemUIFactory extends SystemUIFactory {
-    private boolean mIsSystemUser;
 
     @Override
     protected GlobalRootComponent buildGlobalRootComponent(Context context) {
-        mIsSystemUser = context.getUserId() == UserHandle.USER_SYSTEM;
         return DaggerCarGlobalRootComponent.builder()
                 .context(context)
                 .build();
@@ -69,8 +65,7 @@ public class CarSystemUIFactory extends SystemUIFactory {
     protected SysUIComponent.Builder prepareSysUIComponentBuilder(
             SysUIComponent.Builder sysUIBuilder, WMComponent wm) {
         CarWMComponent carWm = (CarWMComponent) wm;
-        return ((CarSysUIComponent.Builder) sysUIBuilder).setRootTaskDisplayAreaOrganizer(
-                mIsSystemUser ? Optional.of(carWm.getRootTaskDisplayAreaOrganizer())
-                        : Optional.empty());
+        return ((CarSysUIComponent.Builder) sysUIBuilder)
+                .setRootTaskDisplayAreaOrganizer(carWm.getRootTaskDisplayAreaOrganizer());
     }
 }
