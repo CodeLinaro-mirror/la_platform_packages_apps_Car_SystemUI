@@ -210,6 +210,7 @@
     <dimen name="car_system_bar_button_width">64dp</dimen>
     <dimen name="car_system_bar_button_icon_height">44dp</dimen>
     <dimen name="car_system_bar_width">760dp</dimen>
+    <dimen name="car_system_bar_user_name_max_width">176dp</dimen>
     <dimen name="car_left_system_bar_width">96dp</dimen>
     <dimen name="car_right_system_bar_width">96dp</dimen>
     <!-- In order to change the height of the bottom nav bar, overlay system_bar_height in
@@ -228,8 +229,4 @@
     <dimen name="car_fullscreen_user_pod_image_avatar_height">96dp</dimen>
     <dimen name="car_user_switching_dialog_loading_text_margin_top">@*android:dimen/car_padding_4</dimen>
     <dimen name="car_user_switching_dialog_loading_text_font_size">@*android:dimen/car_body1_size</dimen>
-
-    <!-- dimensions for rear view camera -->
-    <dimen name="rear_view_camera_width">600dp</dimen>
-    <dimen name="rear_view_camera_height">500dp</dimen>
 </resources>
