@@ -29,6 +29,7 @@ import android.inputmethodservice.InputMethodService;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.view.Display;
+import android.view.InsetsVisibilities;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsetsController;
@@ -42,6 +43,7 @@ import com.android.internal.view.AppearanceRegion;
 import com.android.systemui.SystemUI;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedListener;
+import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.plugins.DarkIconDispatcher;
@@ -79,6 +81,8 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
     private final IStatusBarService mBarService;
     private final Lazy<KeyguardStateController> mKeyguardStateControllerLazy;
     private final Lazy<PhoneStatusBarPolicy> mIconPolicyLazy;
+    private final HvacController mHvacController;
+
     private final int mDisplayId;
     private final SystemBarConfigs mSystemBarConfigs;
 
@@ -132,6 +136,7 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
             IStatusBarService barService,
             Lazy<KeyguardStateController> keyguardStateControllerLazy,
             Lazy<PhoneStatusBarPolicy> iconPolicyLazy,
+            HvacController hvacController,
             StatusBarSignalPolicy signalPolicy,
             SystemBarConfigs systemBarConfigs
     ) {
@@ -148,6 +153,7 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
         mBarService = barService;
         mKeyguardStateControllerLazy = keyguardStateControllerLazy;
         mIconPolicyLazy = iconPolicyLazy;
+        mHvacController = hvacController;
         mSystemBarConfigs = systemBarConfigs;
         mSignalPolicy = signalPolicy;
         mDisplayId = context.getDisplayId();
@@ -176,7 +182,8 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
         }
 
         onSystemBarAttributesChanged(mDisplayId, result.mAppearance, result.mAppearanceRegions,
-                result.mNavbarColorManagedByIme, result.mBehavior, result.mAppFullscreen);
+                result.mNavbarColorManagedByIme, result.mBehavior, result.mRequestedVisibilities,
+                result.mPackageName);
 
         // StatusBarManagerService has a back up of IME token and it's restored here.
         setImeWindowStatus(mDisplayId, result.mImeToken, result.mImeWindowVis,
@@ -247,8 +254,6 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
         mActivityManagerWrapper = ActivityManagerWrapper.getInstance();
         mActivityManagerWrapper.registerTaskStackListener(mButtonSelectionStateListener);
 
-        mUiBgExecutor.execute(mCarSystemBarController::connectToHvac);
-
         // Lastly, call to the icon policy to install/update all the icons.
         // Must be called on the main thread due to the use of observeForever() in
         // mIconPolicy.init().
@@ -280,21 +285,25 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
 
         if (mTopSystemBarWindow != null) {
             mTopSystemBarWindow.removeAllViews();
+            mHvacController.unregisterViews(mTopSystemBarView);
             mTopSystemBarView = null;
         }
 
         if (mBottomSystemBarWindow != null) {
             mBottomSystemBarWindow.removeAllViews();
+            mHvacController.unregisterViews(mBottomSystemBarView);
             mBottomSystemBarView = null;
         }
 
         if (mLeftSystemBarWindow != null) {
             mLeftSystemBarWindow.removeAllViews();
+            mHvacController.unregisterViews(mLeftSystemBarView);
             mLeftSystemBarView = null;
         }
 
         if (mRightSystemBarWindow != null) {
             mRightSystemBarWindow.removeAllViews();
+            mHvacController.unregisterViews(mRightSystemBarView);
             mRightSystemBarView = null;
         }
 
@@ -340,24 +349,28 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
         mTopSystemBarView = mCarSystemBarController.getTopBar(isDeviceSetupForUser());
         if (mTopSystemBarView != null) {
             mSystemBarConfigs.insetSystemBar(SystemBarConfigs.TOP, mTopSystemBarView);
+            mHvacController.registerHvacViews(mTopSystemBarView);
             mTopSystemBarWindow.addView(mTopSystemBarView);
         }
 
         mBottomSystemBarView = mCarSystemBarController.getBottomBar(isDeviceSetupForUser());
         if (mBottomSystemBarView != null) {
             mSystemBarConfigs.insetSystemBar(SystemBarConfigs.BOTTOM, mBottomSystemBarView);
+            mHvacController.registerHvacViews(mBottomSystemBarView);
             mBottomSystemBarWindow.addView(mBottomSystemBarView);
         }
 
         mLeftSystemBarView = mCarSystemBarController.getLeftBar(isDeviceSetupForUser());
         if (mLeftSystemBarView != null) {
             mSystemBarConfigs.insetSystemBar(SystemBarConfigs.LEFT, mLeftSystemBarView);
+            mHvacController.registerHvacViews(mLeftSystemBarView);
             mLeftSystemBarWindow.addView(mLeftSystemBarView);
         }
 
         mRightSystemBarView = mCarSystemBarController.getRightBar(isDeviceSetupForUser());
         if (mRightSystemBarView != null) {
             mSystemBarConfigs.insetSystemBar(SystemBarConfigs.RIGHT, mRightSystemBarView);
+            mHvacController.registerHvacViews(mRightSystemBarView);
             mRightSystemBarWindow.addView(mRightSystemBarView);
         }
     }
@@ -440,7 +453,8 @@ public class CarSystemBar extends SystemUI implements CommandQueue.Callbacks {
             AppearanceRegion[] appearanceRegions,
             boolean navbarColorManagedByIme,
             @WindowInsetsController.Behavior int behavior,
-            boolean isFullscreen) {
+            InsetsVisibilities requestedVisibilities,
+            String packageName) {
         if (displayId != mDisplayId) {
             return;
         }

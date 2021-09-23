@@ -16,15 +16,19 @@
 
 package com.android.systemui.wmshell;
 
+import static android.view.Display.DEFAULT_DISPLAY;
+
 import android.content.Context;
 import android.os.Handler;
 import android.view.IWindowManager;
+import android.window.StartingWindowInfo;
 
 import com.android.systemui.dagger.WMSingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.wm.DisplaySystemBarsController;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
+import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.TransactionPool;
 import com.android.wm.shell.pip.Pip;
 import com.android.wm.shell.startingsurface.StartingWindowTypeAlgorithm;
@@ -41,9 +45,10 @@ public abstract class CarWMShellModule {
     @Provides
     static DisplayImeController provideDisplayImeController(Context context,
             IWindowManager wmService, DisplayController displayController,
+            DisplayInsetsController displayInsetsController,
             @Main Handler mainHandler, TransactionPool transactionPool) {
         return new DisplaySystemBarsController(context, wmService, displayController,
-                mainHandler, transactionPool);
+                displayInsetsController, mainHandler, transactionPool);
     }
 
     @BindsOptionalOf
@@ -52,6 +57,17 @@ public abstract class CarWMShellModule {
     @WMSingleton
     @Provides
     static StartingWindowTypeAlgorithm provideStartingWindowTypeAlgorithm() {
-        return new PhoneStartingWindowTypeAlgorithm();
+        return new CarStartingWindowTypeAlgorithm();
+    }
+
+    private static class CarStartingWindowTypeAlgorithm extends PhoneStartingWindowTypeAlgorithm {
+        @Override
+        public int getSuggestedWindowType(StartingWindowInfo windowInfo) {
+            if (windowInfo.taskInfo != null && windowInfo.taskInfo.displayId != DEFAULT_DISPLAY) {
+                // TODO(b/194420095): Remove this as soon as the bug is fixed.
+                return StartingWindowInfo.STARTING_WINDOW_TYPE_NONE;
+            }
+            return super.getSuggestedWindowType(windowInfo);
+        }
     }
 }
