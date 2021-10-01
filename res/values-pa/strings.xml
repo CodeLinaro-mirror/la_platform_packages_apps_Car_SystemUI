@@ -19,6 +19,9 @@
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="hvac_min_text" msgid="866677328637088715">"ਨਿਊਨਤਮ"</string>
     <string name="hvac_max_text" msgid="7627950157128770380">"ਅਧਿਕਤਮ"</string>
+    <string name="fan_speed_max" msgid="956683571700419211">"ਅਧਿਕਤਮ"</string>
+    <string name="fan_speed_off" msgid="3860115181014880798">"ਬੰਦ"</string>
+    <string name="hvac_temperature_off" msgid="8370977023494579242">"ਬੰਦ"</string>
     <string name="voice_recognition_toast" msgid="7579725862117020349">"ਅਵਾਜ਼ ਦੀ ਪਛਾਣ ਨੂੰ ਹੁਣ ਕਨੈਕਟ ਕੀਤਾ ਬਲੂਟੁੱਥ ਡੀਵਾਈਸ ਸੰਭਾਲਦਾ ਹੈ"</string>
     <string name="car_guest" msgid="768913000117469596">"ਮਹਿਮਾਨ"</string>
     <string name="start_guest_session" msgid="2759367183497948650">"ਮਹਿਮਾਨ"</string>
@@ -41,4 +44,6 @@
     <string name="mic_privacy_chip_off_toast" msgid="8718743873640788032">"ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਬੰਦ ਕੀਤਾ ਹੋਇਆ ਹੈ"</string>
     <string name="mic_privacy_chip_dialog_title_mic" msgid="3782090299882049010">"ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਦੀ ਹਾਲੀਆ ਵਰਤੋਂ"</string>
     <string name="mic_privacy_chip_dialog_ok" msgid="2298690833121720237">"ਠੀਕ ਹੈ"</string>
+    <string name="sensor_privacy_start_use_mic_dialog_title" msgid="2609868628872435121">"ਕੀ ਵਾਹਨ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਨੂੰ ਚਾਲੂ ਕਰਨਾ ਹੈ?"</string>
+    <string name="sensor_privacy_start_use_mic_dialog_content" msgid="5546778445306036986">"ਇਸ ਨਾਲ ਐਪਾਂ ਅਤੇ ਸੇਵਾਵਾਂ ਨੂੰ ਤੁਹਾਡੇ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਤੱਰ ਪਹੁੰਚ ਕਰਨ ਦਾ ਵਿਕਲਪ ਮਿਲਦਾ ਹੈ।"</string>
 </resources>

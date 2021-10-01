@@ -105,7 +105,7 @@ public class OverlayViewGlobalStateControllerTest extends SysuiTestCase {
     public void registerMediator_overlayViewMediatorViewControllerSetup() {
         mOverlayViewGlobalStateController.registerMediator(mOverlayViewMediator);
 
-        verify(mOverlayViewMediator).setupOverlayContentViewControllers();
+        verify(mOverlayViewMediator).setUpOverlayContentViewControllers();
     }
 
     @Test
@@ -1046,5 +1046,7 @@ public class OverlayViewGlobalStateControllerTest extends SysuiTestCase {
         when(mSystemUIOverlayWindowController.getBaseLayout()).thenReturn(mBaseLayout);
         when(overlayViewController.getLayout()).thenReturn(layout);
         when(overlayViewController.isInflated()).thenReturn(true);
+        when(overlayViewController.getInsetSidesToFit()).thenReturn(
+                OverlayViewController.INVALID_INSET_SIDE);
     }
 }
