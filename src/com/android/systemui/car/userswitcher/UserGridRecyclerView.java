@@ -32,7 +32,6 @@ import android.app.Dialog;
 import android.car.user.CarUserManager;
 import android.car.user.UserCreationResult;
 import android.car.user.UserSwitchResult;
-import android.car.userlib.UserHelper;
 import android.car.util.concurrent.AsyncFuture;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -54,7 +53,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.core.graphics.drawable.RoundedBitmapDrawable;
@@ -63,6 +61,7 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.car.admin.ui.UserAvatarView;
+import com.android.car.internal.user.UserHelper;
 import com.android.internal.util.UserIcons;
 import com.android.systemui.R;
 
@@ -510,7 +509,7 @@ public class UserGridRecyclerView extends RecyclerView {
                 return null;
             }
 
-            return userCreationResult.getUser();
+            return mUserManager.getUserInfo(userCreationResult.getUser().getIdentifier());
         }
 
         private boolean switchUser(@UserIdInt int userId) {
@@ -546,9 +545,9 @@ public class UserGridRecyclerView extends RecyclerView {
                 try {
                     UserInfo user = getUserInfo(future);
                     if (user != null) {
-                        UserHelper.setDefaultNonAdminRestrictions(mContext, user,
+                        UserHelper.setDefaultNonAdminRestrictions(mContext, user.getUserHandle(),
                                 /* enable= */ true);
-                        UserHelper.assignDefaultIcon(mContext, user);
+                        UserHelper.assignDefaultIcon(mContext, user.getUserHandle());
                         mAddUserRecord = new UserRecord(user, UserRecord.ADD_USER);
                         return user;
                     } else {
