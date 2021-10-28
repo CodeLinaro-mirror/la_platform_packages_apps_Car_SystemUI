@@ -27,7 +27,6 @@ import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 
 import androidx.annotation.CallSuper;
@@ -309,6 +308,8 @@ public abstract class OverlayPanelViewController extends OverlayViewController {
             float from = getCurrentStartPosition(rect);
             if (from != to) {
                 animate(from, to, velocity, isClosing);
+            } else if (isClosing) {
+                resetPanelVisibility();
             }
 
             // If we swipe down the notification panel all the way to the bottom of the screen
@@ -372,10 +373,7 @@ public abstract class OverlayPanelViewController extends OverlayViewController {
                 mOpeningVelocity = DEFAULT_FLING_VELOCITY;
                 mClosingVelocity = DEFAULT_FLING_VELOCITY;
                 if (isClosing) {
-                    setPanelVisible(false);
-                    getLayout().setClipBounds(null);
-                    onCollapseAnimationEnd();
-                    setPanelExpanded(false);
+                    resetPanelVisibility();
                 } else {
                     onExpandAnimationEnd();
                     setPanelExpanded(true);
@@ -384,6 +382,13 @@ public abstract class OverlayPanelViewController extends OverlayViewController {
         });
         getFlingAnimationUtils().apply(animator, from, to, Math.abs(velocity));
         animator.start();
+    }
+
+    private void resetPanelVisibility() {
+        setPanelVisible(false);
+        getLayout().setClipBounds(null);
+        onCollapseAnimationEnd();
+        setPanelExpanded(false);
     }
 
     /**
@@ -509,15 +514,7 @@ public abstract class OverlayPanelViewController extends OverlayViewController {
         View handleBar = getLayout().findViewById(getHandleBarViewId());
         if (handleBar == null) return;
 
-        ViewGroup.MarginLayoutParams lp =
-                (ViewGroup.MarginLayoutParams) handleBar.getLayoutParams();
-        // Adjust handlebar to new pointer position, and a little more depending on the
-        // animate direction so the bar can be seen fully.
-        if (mAnimateDirection > 0) {
-            handleBar.setTranslationY(y - handleBar.getHeight() - lp.bottomMargin);
-        } else {
-            handleBar.setTranslationY(y + handleBar.getHeight() + lp.topMargin);
-        }
+        handleBar.setTranslationY(y);
     }
 
     /* ***************************************************************************************** *
