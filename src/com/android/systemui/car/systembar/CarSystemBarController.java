@@ -56,6 +56,7 @@ public class CarSystemBarController {
     private final boolean mShowBottom;
     private final boolean mShowLeft;
     private final boolean mShowRight;
+    private final int mPrivacyChipXOffset;
 
     private View.OnTouchListener mTopBarTouchListener;
     private View.OnTouchListener mBottomBarTouchListener;
@@ -100,6 +101,9 @@ public class CarSystemBarController {
         mShowBottom = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.BOTTOM);
         mShowLeft = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.LEFT);
         mShowRight = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.RIGHT);
+
+        mPrivacyChipXOffset = -context.getResources()
+                .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
     }
 
     /**
@@ -128,6 +132,8 @@ public class CarSystemBarController {
         mButtonRoleHolderController.removeAll();
         mUserNameViewControllerLazy.get().removeAll();
         mPrivacyChipViewControllerLazy.get().removeAll();
+        mMicPanelController = null;
+        mProfilePanelController = null;
     }
 
     /** Gets the top window if configured to do so. */
@@ -197,13 +203,14 @@ public class CarSystemBarController {
         mTopView = mCarSystemBarViewFactory.getTopBar(isSetUp);
         setupBar(mTopView, mTopBarTouchListener, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController);
-        setupMicQcPanel();
-        if (mProfilePanelController == null) {
-            mProfilePanelController = new StatusIconPanelController(
-                    mContext, mCarServiceProvider, mBroadcastDispatcher, mConfigurationController);
-            mProfilePanelController.attachPanel(mTopView.requireViewById(R.id.user_name),
-                    R.layout.qc_profile_switcher, R.dimen.car_profile_quick_controls_panel_width);
+
+        if (isSetUp) {
+            // We do not want the mic privacy chip or the profile picker to be clickable in
+            // unprovisioned mode.
+            setupMicQcPanel();
+            setupProfilePanel();
         }
+
         return mTopView;
     }
 
@@ -275,8 +282,21 @@ public class CarSystemBarController {
         }));
 
         mMicPanelController.attachPanel(mTopView.requireViewById(R.id.privacy_chip),
-                R.layout.qc_mic_panel, R.dimen.car_mic_qc_panel_width,
-                /* xOffset= */ 0, /* yOffset= */ 0, Gravity.TOP | Gravity.END);
+                R.layout.qc_mic_panel, R.dimen.car_mic_qc_panel_width, mPrivacyChipXOffset,
+                mMicPanelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+    }
+
+    private void setupProfilePanel() {
+        View profilePickerView = mTopView.findViewById(R.id.user_name);
+        if (mProfilePanelController == null && profilePickerView != null) {
+            boolean profilePanelDisabledWhileDriving = mContext.getResources().getBoolean(
+                    R.bool.config_profile_panel_disabled_while_driving);
+            mProfilePanelController = new StatusIconPanelController(mContext, mCarServiceProvider,
+                    mBroadcastDispatcher, mConfigurationController,
+                    profilePanelDisabledWhileDriving);
+            mProfilePanelController.attachPanel(profilePickerView, R.layout.qc_profile_switcher,
+                    R.dimen.car_profile_quick_controls_panel_width);
+        }
     }
 
     /** Sets a touch listener for the top navigation bar. */
