@@ -19,7 +19,6 @@ package com.android.systemui.car.keyguard;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.ViewRootImpl;
 
 import androidx.annotation.VisibleForTesting;
@@ -39,6 +38,7 @@ import com.android.systemui.statusbar.phone.KeyguardBouncer.Factory;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.phone.NotificationPanelViewController;
 import com.android.systemui.statusbar.phone.StatusBar;
+import com.android.systemui.statusbar.phone.panelstate.PanelExpansionStateManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.concurrency.DelayableExecutor;
 
@@ -342,10 +342,13 @@ public class CarKeyguardViewController extends OverlayViewController implements
     }
 
     @Override
-    public void registerStatusBar(StatusBar statusBar, ViewGroup container,
+    public void registerStatusBar(
+            StatusBar statusBar,
             NotificationPanelViewController notificationPanelViewController,
+            PanelExpansionStateManager panelExpansionStateManager,
             BiometricUnlockController biometricUnlockController,
-            View notificationContainer, KeyguardBypassController bypassController) {
+            View notificationContainer,
+            KeyguardBypassController bypassController) {
         // no-op
     }
 

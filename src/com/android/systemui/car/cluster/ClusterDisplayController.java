@@ -31,7 +31,7 @@ import android.window.DisplayAreaInfo;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
-import com.android.systemui.SystemUI;
+import com.android.systemui.CoreStartable;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -46,7 +46,7 @@ import javax.inject.Inject;
  * Controls the RootTDA of cluster display per CLUSTER_DISPLAY_STATE message.
  */
 @SysUISingleton
-public class ClusterDisplayController extends SystemUI {
+public class ClusterDisplayController extends CoreStartable {
     private static final String TAG = ClusterDisplayController.class.getSimpleName();
     private static final boolean DBG = false;
 
@@ -87,7 +87,7 @@ public class ClusterDisplayController extends SystemUI {
                 Slog.w(TAG, "ClusterHomeManager is disabled");
                 return;
             }
-            mClusterHomeManager.registerClusterHomeCallback(mMainExecutor, mClusterHomeCallback);
+            mClusterHomeManager.registerClusterStateListener(mMainExecutor, mClusterStateListener);
 
             mClusterState = mClusterHomeManager.getClusterState();
             if (mClusterState.displayId != Display.INVALID_DISPLAY) {
@@ -96,8 +96,8 @@ public class ClusterDisplayController extends SystemUI {
         }
     };
 
-    private final ClusterHomeManager.ClusterHomeCallback mClusterHomeCallback =
-            new ClusterHomeManager.ClusterHomeCallback() {
+    private final ClusterHomeManager.ClusterStateListener mClusterStateListener =
+            new ClusterHomeManager.ClusterStateListener() {
         @Override
         public void onClusterStateChanged(ClusterState state, int changes) {
             // Need to update mClusterState first, since mClusterState will be referenced during
@@ -118,9 +118,6 @@ public class ClusterDisplayController extends SystemUI {
                 resizeTDA(mRootTDAToken, state.bounds, state.displayId);
             }
         }
-
-        @Override
-        public void onNavigationState(byte[] navigationState) {}
     };
 
     private final RootTaskDisplayAreaOrganizer.RootTaskDisplayAreaListener mRootTDAListener =

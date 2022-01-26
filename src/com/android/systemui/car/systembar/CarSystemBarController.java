@@ -17,13 +17,21 @@
 package com.android.systemui.car.systembar;
 
 import android.content.Context;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
 
+import com.android.systemui.R;
+import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.car.CarServiceProvider;
+import com.android.systemui.car.hvac.HvacPanelOverlayViewController;
+import com.android.systemui.car.privacy.MicQcPanel;
 import com.android.systemui.car.statusbar.UserNameViewController;
+import com.android.systemui.car.statusicon.StatusIconPanelController;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.statusbar.policy.ConfigurationController;
 
 import javax.inject.Inject;
 
@@ -35,15 +43,20 @@ public class CarSystemBarController {
 
     private final Context mContext;
     private final CarSystemBarViewFactory mCarSystemBarViewFactory;
+    private final CarServiceProvider mCarServiceProvider;
+    private final BroadcastDispatcher mBroadcastDispatcher;
+    private final ConfigurationController mConfigurationController;
     private final ButtonSelectionStateController mButtonSelectionStateController;
     private final ButtonRoleHolderController mButtonRoleHolderController;
     private final Lazy<UserNameViewController> mUserNameViewControllerLazy;
     private final Lazy<PrivacyChipViewController> mPrivacyChipViewControllerLazy;
+    private final Lazy<MicQcPanel.MicPrivacyElementsProvider> mMicPrivacyElementsProviderLazy;
 
     private final boolean mShowTop;
     private final boolean mShowBottom;
     private final boolean mShowLeft;
     private final boolean mShowRight;
+    private final int mPrivacyChipXOffset;
 
     private View.OnTouchListener mTopBarTouchListener;
     private View.OnTouchListener mBottomBarTouchListener;
@@ -51,6 +64,9 @@ public class CarSystemBarController {
     private View.OnTouchListener mRightBarTouchListener;
     private NotificationsShadeController mNotificationsShadeController;
     private HvacPanelController mHvacPanelController;
+    private StatusIconPanelController mMicPanelController;
+    private StatusIconPanelController mProfilePanelController;
+    private HvacPanelOverlayViewController mHvacPanelOverlayViewController;
 
     private CarSystemBarView mTopView;
     private CarSystemBarView mBottomView;
@@ -60,23 +76,34 @@ public class CarSystemBarController {
     @Inject
     public CarSystemBarController(Context context,
             CarSystemBarViewFactory carSystemBarViewFactory,
+            CarServiceProvider carServiceProvider,
+            BroadcastDispatcher broadcastDispatcher,
+            ConfigurationController configurationController,
             ButtonSelectionStateController buttonSelectionStateController,
             Lazy<UserNameViewController> userNameViewControllerLazy,
             Lazy<PrivacyChipViewController> privacyChipViewControllerLazy,
             ButtonRoleHolderController buttonRoleHolderController,
-            SystemBarConfigs systemBarConfigs) {
+            SystemBarConfigs systemBarConfigs,
+            Lazy<MicQcPanel.MicPrivacyElementsProvider> micPrivacyElementsProvider) {
         mContext = context;
         mCarSystemBarViewFactory = carSystemBarViewFactory;
+        mCarServiceProvider = carServiceProvider;
+        mBroadcastDispatcher = broadcastDispatcher;
+        mConfigurationController = configurationController;
         mButtonSelectionStateController = buttonSelectionStateController;
         mUserNameViewControllerLazy = userNameViewControllerLazy;
         mPrivacyChipViewControllerLazy = privacyChipViewControllerLazy;
         mButtonRoleHolderController = buttonRoleHolderController;
+        mMicPrivacyElementsProviderLazy = micPrivacyElementsProvider;
 
         // Read configuration.
         mShowTop = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.TOP);
         mShowBottom = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.BOTTOM);
         mShowLeft = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.LEFT);
         mShowRight = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.RIGHT);
+
+        mPrivacyChipXOffset = -context.getResources()
+                .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
     }
 
     /**
@@ -105,6 +132,8 @@ public class CarSystemBarController {
         mButtonRoleHolderController.removeAll();
         mUserNameViewControllerLazy.get().removeAll();
         mPrivacyChipViewControllerLazy.get().removeAll();
+        mMicPanelController = null;
+        mProfilePanelController = null;
     }
 
     /** Gets the top window if configured to do so. */
@@ -173,7 +202,15 @@ public class CarSystemBarController {
 
         mTopView = mCarSystemBarViewFactory.getTopBar(isSetUp);
         setupBar(mTopView, mTopBarTouchListener, mNotificationsShadeController,
-                mHvacPanelController);
+                mHvacPanelController, mHvacPanelOverlayViewController);
+
+        if (isSetUp) {
+            // We do not want the mic privacy chip or the profile picker to be clickable in
+            // unprovisioned mode.
+            setupMicQcPanel();
+            setupProfilePanel();
+        }
+
         return mTopView;
     }
 
@@ -186,7 +223,7 @@ public class CarSystemBarController {
 
         mBottomView = mCarSystemBarViewFactory.getBottomBar(isSetUp);
         setupBar(mBottomView, mBottomBarTouchListener, mNotificationsShadeController,
-                mHvacPanelController);
+                mHvacPanelController, mHvacPanelOverlayViewController);
         return mBottomView;
     }
 
@@ -199,7 +236,7 @@ public class CarSystemBarController {
 
         mLeftView = mCarSystemBarViewFactory.getLeftBar(isSetUp);
         setupBar(mLeftView, mLeftBarTouchListener, mNotificationsShadeController,
-                mHvacPanelController);
+                mHvacPanelController, mHvacPanelOverlayViewController);
         return mLeftView;
     }
 
@@ -212,20 +249,54 @@ public class CarSystemBarController {
 
         mRightView = mCarSystemBarViewFactory.getRightBar(isSetUp);
         setupBar(mRightView, mRightBarTouchListener, mNotificationsShadeController,
-                mHvacPanelController);
+                mHvacPanelController, mHvacPanelOverlayViewController);
         return mRightView;
     }
 
     private void setupBar(CarSystemBarView view, View.OnTouchListener statusBarTouchListener,
             NotificationsShadeController notifShadeController,
-            HvacPanelController hvacPanelController) {
+            HvacPanelController hvacPanelController,
+            HvacPanelOverlayViewController hvacPanelOverlayViewController) {
         view.setStatusBarWindowTouchListener(statusBarTouchListener);
         view.setNotificationsPanelController(notifShadeController);
         view.setHvacPanelController(hvacPanelController);
+        view.registerHvacPanelOverlayViewController(hvacPanelOverlayViewController);
         mButtonSelectionStateController.addAllButtonsWithSelectionState(view);
         mButtonRoleHolderController.addAllButtonsWithRoleName(view);
         mUserNameViewControllerLazy.get().addUserNameView(view);
         mPrivacyChipViewControllerLazy.get().addPrivacyChipView(view);
+    }
+
+    private void setupMicQcPanel() {
+        if (mMicPanelController == null) {
+            mMicPanelController = new StatusIconPanelController(mContext, mCarServiceProvider,
+                    mBroadcastDispatcher, mConfigurationController);
+        }
+
+        mMicPanelController.setOnQcViewsFoundListener(qcViews -> qcViews.forEach(qcView -> {
+            if (qcView.getLocalQCProvider() instanceof MicQcPanel) {
+                MicQcPanel micQcPanel = (MicQcPanel) qcView.getLocalQCProvider();
+                micQcPanel.setControllers(mPrivacyChipViewControllerLazy.get(),
+                        mMicPrivacyElementsProviderLazy.get());
+            }
+        }));
+
+        mMicPanelController.attachPanel(mTopView.requireViewById(R.id.privacy_chip),
+                R.layout.qc_mic_panel, R.dimen.car_mic_qc_panel_width, mPrivacyChipXOffset,
+                mMicPanelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+    }
+
+    private void setupProfilePanel() {
+        View profilePickerView = mTopView.findViewById(R.id.user_name);
+        if (mProfilePanelController == null && profilePickerView != null) {
+            boolean profilePanelDisabledWhileDriving = mContext.getResources().getBoolean(
+                    R.bool.config_profile_panel_disabled_while_driving);
+            mProfilePanelController = new StatusIconPanelController(mContext, mCarServiceProvider,
+                    mBroadcastDispatcher, mConfigurationController,
+                    profilePanelDisabledWhileDriving);
+            mProfilePanelController.attachPanel(profilePickerView, R.layout.qc_profile_switcher,
+                    R.dimen.car_profile_quick_controls_panel_width);
+        }
     }
 
     /** Sets a touch listener for the top navigation bar. */
@@ -292,6 +363,24 @@ public class CarSystemBarController {
         }
         if (mRightView != null) {
             mRightView.setHvacPanelController(mHvacPanelController);
+        }
+    }
+
+    /** Sets the HVACPanelOverlayViewController for views to listen to the panel's state. */
+    public void registerHvacPanelOverlayViewController(
+            HvacPanelOverlayViewController hvacPanelOverlayViewController) {
+        mHvacPanelOverlayViewController = hvacPanelOverlayViewController;
+        if (mTopView != null) {
+            mTopView.registerHvacPanelOverlayViewController(mHvacPanelOverlayViewController);
+        }
+        if (mBottomView != null) {
+            mBottomView.registerHvacPanelOverlayViewController(mHvacPanelOverlayViewController);
+        }
+        if (mLeftView != null) {
+            mLeftView.registerHvacPanelOverlayViewController(mHvacPanelOverlayViewController);
+        }
+        if (mRightView != null) {
+            mRightView.registerHvacPanelOverlayViewController(mHvacPanelOverlayViewController);
         }
     }
 

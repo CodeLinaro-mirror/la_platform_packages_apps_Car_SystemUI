@@ -19,17 +19,20 @@ package com.android.systemui.car.statusicon;
 import static com.android.systemui.car.statusicon.StatusIconController.PANEL_CONTENT_LAYOUT_NONE;
 
 import android.annotation.ArrayRes;
+import android.annotation.ColorInt;
 import android.annotation.LayoutRes;
 import android.content.Context;
 import android.content.res.Resources;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.statusbar.policy.ConfigurationController;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -47,8 +50,10 @@ public abstract class StatusIconGroupContainerController {
     private final Resources mResources;
     private final CarServiceProvider mCarServiceProvider;
     private final BroadcastDispatcher mBroadcastDispatcher;
+    private final ConfigurationController mConfigurationController;
     private final Map<Class<?>, Provider<StatusIconController>> mIconControllerCreators;
     private final String mIconTag;
+    private final @ColorInt int mIconNotHighlightedColor;
     private final String[] mStatusIconControllerNames;
 
     public StatusIconGroupContainerController(
@@ -56,13 +61,16 @@ public abstract class StatusIconGroupContainerController {
             @Main Resources resources,
             CarServiceProvider carServiceProvider,
             BroadcastDispatcher broadcastDispatcher,
+            ConfigurationController configurationController,
             Map<Class<?>, Provider<StatusIconController>> iconControllerCreators) {
         mContext = context;
         mResources = resources;
         mCarServiceProvider = carServiceProvider;
         mBroadcastDispatcher = broadcastDispatcher;
+        mConfigurationController = configurationController;
         mIconControllerCreators = iconControllerCreators;
         mIconTag = mResources.getString(R.string.qc_icon_tag);
+        mIconNotHighlightedColor = mContext.getColor(R.color.status_icon_not_highlighted_color);
         mStatusIconControllerNames = mResources.getStringArray(
                 getStatusIconControllersStringArray());
     }
@@ -86,19 +94,32 @@ public abstract class StatusIconGroupContainerController {
     }
 
     /**
-     * Adds Quick Control entry points to the provided container ViewGroup.
+     * See {@link #addIconViews(ViewGroup, boolean)}
      */
     public void addIconViews(ViewGroup containerViewGroup) {
+        addIconViews(containerViewGroup, /* shouldAttachPanel= */ true);
+    }
+
+    /**
+     * Adds Quick Control entry points to the provided container ViewGroup. Also attaches
+     * the Quick Control panel if it's specified and allowed.
+     */
+    public void addIconViews(ViewGroup containerViewGroup, boolean shouldAttachPanel) {
         LayoutInflater li = LayoutInflater.from(mContext);
 
         for (String clsName : mStatusIconControllerNames) {
             StatusIconController statusIconController = getStatusIconControllerByName(clsName);
             View entryPointView = li.inflate(getButtonViewLayout(),
                     containerViewGroup, /* attachToRoot= */ false);
-            statusIconController.registerIconView(entryPointView.findViewWithTag(mIconTag));
-            if (statusIconController.getPanelContentLayout() != PANEL_CONTENT_LAYOUT_NONE) {
+
+            ImageView statusIconView = entryPointView.findViewWithTag(mIconTag);
+            statusIconController.registerIconView(statusIconView);
+            statusIconView.setColorFilter(mIconNotHighlightedColor);
+
+            if (shouldAttachPanel
+                    && statusIconController.getPanelContentLayout() != PANEL_CONTENT_LAYOUT_NONE) {
                 StatusIconPanelController panelController = new StatusIconPanelController(mContext,
-                        mCarServiceProvider, mBroadcastDispatcher);
+                        mCarServiceProvider, mBroadcastDispatcher, mConfigurationController);
                 panelController.attachPanel(entryPointView,
                         statusIconController.getPanelContentLayout(),
                         statusIconController.getPanelWidth());

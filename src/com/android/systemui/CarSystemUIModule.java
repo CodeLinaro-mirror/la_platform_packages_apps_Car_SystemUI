@@ -31,6 +31,8 @@ import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedControllerImpl;
 import com.android.systemui.car.keyguard.CarKeyguardViewController;
 import com.android.systemui.car.notification.NotificationShadeWindowControllerImpl;
+import com.android.systemui.car.privacy.MicPrivacyElementsProviderImpl;
+import com.android.systemui.car.privacy.MicQcPanel;
 import com.android.systemui.car.statusbar.DozeServiceHost;
 import com.android.systemui.car.volume.CarVolumeModule;
 import com.android.systemui.dagger.GlobalRootComponent;
@@ -66,6 +68,7 @@ import com.android.systemui.statusbar.policy.BatteryControllerImpl;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
+import com.android.systemui.statusbar.policy.HeadsUpManagerLogger;
 import com.android.systemui.statusbar.policy.IndividualSensorPrivacyController;
 import com.android.systemui.statusbar.policy.IndividualSensorPrivacyControllerImpl;
 import com.android.systemui.statusbar.policy.SensorPrivacyController;
@@ -98,12 +101,19 @@ abstract class CarSystemUIModule {
     @Provides
     static HeadsUpManagerPhone provideHeadsUpManagerPhone(
             Context context,
+            HeadsUpManagerLogger headsUpManagerLogger,
             StatusBarStateController statusBarStateController,
             KeyguardBypassController bypassController,
             GroupMembershipManager groupManager,
             ConfigurationController configurationController) {
-        return new HeadsUpManagerPhone(context, statusBarStateController, bypassController,
-                groupManager, configurationController);
+        return new HeadsUpManagerPhone(
+            context,
+            headsUpManagerLogger,
+            statusBarStateController,
+            bypassController,
+            groupManager,
+            configurationController
+        );
     }
 
     @SysUISingleton
@@ -194,9 +204,12 @@ abstract class CarSystemUIModule {
     abstract NotificationShadeWindowController bindNotificationShadeController(
             NotificationShadeWindowControllerImpl notificationPanelViewController);
 
-    @Binds
-    abstract DeviceProvisionedController bindDeviceProvisionedController(
-            CarDeviceProvisionedControllerImpl deviceProvisionedController);
+    @Provides
+    static DeviceProvisionedController bindDeviceProvisionedController(
+            CarDeviceProvisionedControllerImpl deviceProvisionedController) {
+        deviceProvisionedController.init();
+        return deviceProvisionedController;
+    };
 
     @Binds
     abstract CarDeviceProvisionedController bindCarDeviceProvisionedController(
@@ -204,4 +217,8 @@ abstract class CarSystemUIModule {
 
     @Binds
     abstract DozeHost bindDozeHost(DozeServiceHost dozeServiceHost);
+
+    @Binds
+    abstract MicQcPanel.MicPrivacyElementsProvider bindMicPrivacyElementsProvider(
+            MicPrivacyElementsProviderImpl micPrivacyElementsProvider);
 }

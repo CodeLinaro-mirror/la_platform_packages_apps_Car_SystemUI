@@ -31,12 +31,17 @@ import androidx.test.filters.SmallTest;
 
 import com.android.systemui.R;
 import com.android.systemui.SysuiTestCase;
+import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.CarSystemUiTest;
+import com.android.systemui.car.privacy.MicQcPanel;
 import com.android.systemui.car.statusbar.UserNameViewController;
 import com.android.systemui.car.statusicon.ui.QuickControlsEntryPointsController;
+import com.android.systemui.car.statusicon.ui.ReadOnlyIconsController;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.statusbar.phone.StatusBarIconController;
+import com.android.systemui.statusbar.policy.ConfigurationController;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -70,12 +75,22 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     private FeatureFlags mFeatureFlags;
     @Mock
     private QuickControlsEntryPointsController mQuickControlsEntryPointsController;
+    @Mock
+    private ReadOnlyIconsController mReadOnlyIconsController;
+    @Mock
+    private CarServiceProvider mCarServiceProvider;
+    @Mock
+    private BroadcastDispatcher mBroadcastDispatcher;
+    @Mock
+    private ConfigurationController mConfigurationController;
+    @Mock
+    private MicQcPanel.MicPrivacyElementsProvider mMicPrivacyElementsProvider;
 
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
-        mCarSystemBarViewFactory = new CarSystemBarViewFactory(
-                mContext, mFeatureFlags, mQuickControlsEntryPointsController);
+        mCarSystemBarViewFactory = new CarSystemBarViewFactory(mContext, mFeatureFlags,
+                mQuickControlsEntryPointsController, mReadOnlyIconsController);
         mTestableResources = mContext.getOrCreateTestableResources();
 
         // Needed to inflate top navigation bar.
@@ -84,10 +99,12 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     }
 
     private CarSystemBarController createSystemBarController() {
-        return new CarSystemBarController(mContext, mCarSystemBarViewFactory,
-                mButtonSelectionStateController, () -> mUserNameViewController,
-                () -> mPrivacyChipViewController, mButtonRoleHolderController,
-                new SystemBarConfigs(mTestableResources.getResources()));
+        return new CarSystemBarController(mContext, mCarSystemBarViewFactory, mCarServiceProvider,
+                mBroadcastDispatcher, mConfigurationController, mButtonSelectionStateController,
+                () -> mUserNameViewController, () -> mPrivacyChipViewController,
+                mButtonRoleHolderController,
+                new SystemBarConfigs(mTestableResources.getResources()),
+                () -> mMicPrivacyElementsProvider);
     }
 
     @Test
