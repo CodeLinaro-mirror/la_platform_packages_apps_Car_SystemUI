@@ -16,13 +16,20 @@
 
 package com.android.systemui.car.systembar;
 
+import android.app.ActivityManager;
+import android.app.StatusBarManager;
 import android.content.Context;
+import android.os.Build;
+import android.util.ArraySet;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
@@ -33,6 +40,10 @@ import com.android.systemui.car.statusicon.StatusIconPanelController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 import javax.inject.Inject;
 
 import dagger.Lazy;
@@ -40,6 +51,9 @@ import dagger.Lazy;
 /** A single class which controls the navigation bar views. */
 @SysUISingleton
 public class CarSystemBarController {
+    private static final boolean DEBUG = Build.IS_ENG || Build.IS_USERDEBUG;
+
+    private static final String TAG = CarSystemBarController.class.getSimpleName();
 
     private final Context mContext;
     private final CarSystemBarViewFactory mCarSystemBarViewFactory;
@@ -58,10 +72,11 @@ public class CarSystemBarController {
     private final boolean mShowRight;
     private final int mPrivacyChipXOffset;
 
-    private View.OnTouchListener mTopBarTouchListener;
-    private View.OnTouchListener mBottomBarTouchListener;
-    private View.OnTouchListener mLeftBarTouchListener;
-    private View.OnTouchListener mRightBarTouchListener;
+    private final Set<View.OnTouchListener> mTopBarTouchListeners = new ArraySet<>();
+    private final Set<View.OnTouchListener> mBottomBarTouchListeners = new ArraySet<>();
+    private final Set<View.OnTouchListener> mLeftBarTouchListeners = new ArraySet<>();
+    private final Set<View.OnTouchListener> mRightBarTouchListeners = new ArraySet<>();
+
     private NotificationsShadeController mNotificationsShadeController;
     private HvacPanelController mHvacPanelController;
     private StatusIconPanelController mMicPanelController;
@@ -72,6 +87,12 @@ public class CarSystemBarController {
     private CarSystemBarView mBottomView;
     private CarSystemBarView mLeftView;
     private CarSystemBarView mRightView;
+
+    // Saved StatusBarManager.DisableFlags
+    private int mStatusBarState;
+    // Saved StatusBarManager.Disable2Flags
+    private int mStatusBarState2;
+    private int mLockTaskMode;
 
     @Inject
     public CarSystemBarController(Context context,
@@ -193,6 +214,117 @@ public class CarSystemBarController {
         return true;
     }
 
+    /**
+     * Sets the system bar states - {@code StatusBarManager.DisableFlags},
+     * {@code StatusBarManager.Disable2Flags}, lock task mode. When there is a change in state,
+     * and refreshes the system bars.
+     *
+     * @param state {@code StatusBarManager.DisableFlags}
+     * @param state2 {@code StatusBarManager.Disable2Flags}
+     */
+    public void setSystemBarStates(int state, int state2) {
+        int diff = (state ^ mStatusBarState) | (state2 ^ mStatusBarState2);
+        int lockTaskMode = getLockTaskModeState();
+        if (diff == 0 && mLockTaskMode == lockTaskMode) {
+            if (DEBUG) {
+                Log.d(TAG, "setSystemBarStates(): status bar states unchanged: state: "
+                        + state + " state2: " +  state2 + " lockTaskMode: " + mLockTaskMode);
+            }
+            return;
+        }
+        mStatusBarState = state;
+        mStatusBarState2 = state2;
+        mLockTaskMode = lockTaskMode;
+        refreshSystemBar();
+    }
+
+    @VisibleForTesting
+    protected int getStatusBarState() {
+        return mStatusBarState;
+    }
+
+    @VisibleForTesting
+    protected int getStatusBarState2() {
+        return mStatusBarState2;
+    }
+
+    @VisibleForTesting
+    protected int getLockTaskMode() {
+        return mLockTaskMode;
+    }
+
+    /**
+     * Refreshes system bar views and sets the visibility of certain components based on
+     * {@link StatusBarManager} flags and lock task mode.
+     * <ul>
+     * <li>Home button will be disabled when {@code StatusBarManager.DISABLE_HOME} is set.
+     * <li>Phone call button will be disable in lock task mode.
+     * <li>App grid button will be disable when {@code StatusBarManager.DISABLE_HOME} is set.
+     * <li>Notification button will be disable when
+     * {@code StatusBarManager.DISABLE_NOTIFICATION_ICONS} is set.
+     * <li>Quick settings and user switcher will be hidden when in lock task mode or when
+     * {@code StatusBarManager.DISABLE2_QUICK_SETTINGS} is set.
+     * </ul>
+     */
+    public void refreshSystemBar() {
+        boolean homeDisabled = ((mStatusBarState & StatusBarManager.DISABLE_HOME) > 0);
+        boolean notificationDisabled =
+                ((mStatusBarState & StatusBarManager.DISABLE_NOTIFICATION_ICONS) > 0);
+        boolean locked = (mLockTaskMode == ActivityManager.LOCK_TASK_MODE_LOCKED);
+        boolean qcDisabled =
+                ((mStatusBarState2 & StatusBarManager.DISABLE2_QUICK_SETTINGS) > 0) || locked;
+        boolean systemIconsDisabled =
+                ((mStatusBarState2 & StatusBarManager.DISABLE2_SYSTEM_ICONS) > 0) || locked;
+
+        setDisabledSystemBarButton(R.id.home, homeDisabled, "home");
+        setDisabledSystemBarButton(R.id.phone_nav, locked, "phone_nav");
+        setDisabledSystemBarButton(R.id.grid_nav, homeDisabled, "grid_nav");
+        setDisabledSystemBarButton(R.id.notifications, notificationDisabled, "notifications");
+
+        setDisabledSystemBarContainer(R.id.qc_entry_points_container, qcDisabled,
+                "qc_entry_points_container");
+        setDisabledSystemBarContainer(R.id.user_name_container, qcDisabled,
+                "user_name_container");
+        setDisabledSystemBarContainer(R.id.read_only_icons_container, systemIconsDisabled,
+                "read_only_icons_container");
+
+        if (DEBUG) {
+            Log.d(TAG, "refreshSystemBar: locked?: " + locked
+                    + " homeDisabled: " + homeDisabled
+                    + " notificationDisabled: " + notificationDisabled
+                    + " qcDisabled: " + qcDisabled
+                    + " systemIconsDisabled: " + systemIconsDisabled);
+        }
+    }
+
+    private int getLockTaskModeState() {
+        return mContext.getSystemService(ActivityManager.class).getLockTaskModeState();
+    }
+
+    private void setDisabledSystemBarButton(int viewId, boolean disabled,
+                @Nullable String buttonName) {
+        for (CarSystemBarView barView : getAllAvailableSystemBarViews()) {
+            barView.setDisabledSystemBarButton(viewId, disabled,
+                    () -> showAdminSupportDetailsDialog(), buttonName);
+        }
+    }
+
+    private void setDisabledSystemBarContainer(int viewId, boolean disabled,
+                @Nullable String viewName) {
+        for (CarSystemBarView barView : getAllAvailableSystemBarViews()) {
+            barView.setVisibilityByViewId(viewId, viewName,
+                    disabled ? View.INVISIBLE : View.VISIBLE);
+        }
+    }
+
+    private void showAdminSupportDetailsDialog() {
+        // TODO(b/205891123): launch AdminSupportDetailsDialog after moving
+        // AdminSupportDetailsDialog out of CarSettings since CarSettings is not and should not
+        // be allowlisted for lock task mode.
+        Toast.makeText(mContext, "This action is unavailable for your profile",
+                Toast.LENGTH_LONG).show();
+    }
+
     /** Gets the top navigation bar with the appropriate listeners set. */
     @Nullable
     public CarSystemBarView getTopBar(boolean isSetUp) {
@@ -201,7 +333,7 @@ public class CarSystemBarController {
         }
 
         mTopView = mCarSystemBarViewFactory.getTopBar(isSetUp);
-        setupBar(mTopView, mTopBarTouchListener, mNotificationsShadeController,
+        setupBar(mTopView, mTopBarTouchListeners, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController);
 
         if (isSetUp) {
@@ -222,7 +354,7 @@ public class CarSystemBarController {
         }
 
         mBottomView = mCarSystemBarViewFactory.getBottomBar(isSetUp);
-        setupBar(mBottomView, mBottomBarTouchListener, mNotificationsShadeController,
+        setupBar(mBottomView, mBottomBarTouchListeners, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController);
         return mBottomView;
     }
@@ -235,7 +367,7 @@ public class CarSystemBarController {
         }
 
         mLeftView = mCarSystemBarViewFactory.getLeftBar(isSetUp);
-        setupBar(mLeftView, mLeftBarTouchListener, mNotificationsShadeController,
+        setupBar(mLeftView, mLeftBarTouchListeners, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController);
         return mLeftView;
     }
@@ -248,16 +380,16 @@ public class CarSystemBarController {
         }
 
         mRightView = mCarSystemBarViewFactory.getRightBar(isSetUp);
-        setupBar(mRightView, mRightBarTouchListener, mNotificationsShadeController,
+        setupBar(mRightView, mRightBarTouchListeners, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController);
         return mRightView;
     }
 
-    private void setupBar(CarSystemBarView view, View.OnTouchListener statusBarTouchListener,
+    private void setupBar(CarSystemBarView view, Set<View.OnTouchListener> statusBarTouchListeners,
             NotificationsShadeController notifShadeController,
             HvacPanelController hvacPanelController,
             HvacPanelOverlayViewController hvacPanelOverlayViewController) {
-        view.setStatusBarWindowTouchListener(statusBarTouchListener);
+        view.setStatusBarWindowTouchListeners(statusBarTouchListeners);
         view.setNotificationsPanelController(notifShadeController);
         view.setHvacPanelController(hvacPanelController);
         view.registerHvacPanelOverlayViewController(hvacPanelOverlayViewController);
@@ -295,39 +427,39 @@ public class CarSystemBarController {
                     mBroadcastDispatcher, mConfigurationController,
                     profilePanelDisabledWhileDriving);
             mProfilePanelController.attachPanel(profilePickerView, R.layout.qc_profile_switcher,
-                    R.dimen.car_profile_quick_controls_panel_width);
+                    R.dimen.car_profile_quick_controls_panel_width, Gravity.TOP | Gravity.END);
         }
     }
 
     /** Sets a touch listener for the top navigation bar. */
     public void registerTopBarTouchListener(View.OnTouchListener listener) {
-        mTopBarTouchListener = listener;
-        if (mTopView != null) {
-            mTopView.setStatusBarWindowTouchListener(mTopBarTouchListener);
+        boolean setModified = mTopBarTouchListeners.add(listener);
+        if (setModified && mTopView != null) {
+            mTopView.setStatusBarWindowTouchListeners(mTopBarTouchListeners);
         }
     }
 
     /** Sets a touch listener for the bottom navigation bar. */
     public void registerBottomBarTouchListener(View.OnTouchListener listener) {
-        mBottomBarTouchListener = listener;
-        if (mBottomView != null) {
-            mBottomView.setStatusBarWindowTouchListener(mBottomBarTouchListener);
+        boolean setModified = mBottomBarTouchListeners.add(listener);
+        if (setModified && mBottomView != null) {
+            mBottomView.setStatusBarWindowTouchListeners(mBottomBarTouchListeners);
         }
     }
 
     /** Sets a touch listener for the left navigation bar. */
     public void registerLeftBarTouchListener(View.OnTouchListener listener) {
-        mLeftBarTouchListener = listener;
-        if (mLeftView != null) {
-            mLeftView.setStatusBarWindowTouchListener(mLeftBarTouchListener);
+        boolean setModified = mLeftBarTouchListeners.add(listener);
+        if (setModified && mLeftView != null) {
+            mLeftView.setStatusBarWindowTouchListeners(mLeftBarTouchListeners);
         }
     }
 
     /** Sets a touch listener for the right navigation bar. */
     public void registerRightBarTouchListener(View.OnTouchListener listener) {
-        mRightBarTouchListener = listener;
-        if (mRightView != null) {
-            mRightView.setStatusBarWindowTouchListener(mRightBarTouchListener);
+        boolean setModified = mRightBarTouchListeners.add(listener);
+        if (setModified && mRightView != null) {
+            mRightView.setStatusBarWindowTouchListeners(mRightBarTouchListeners);
         }
     }
 
@@ -483,5 +615,22 @@ public class CarSystemBarController {
         mBottomView = getBottomBar(isSetUp);
         mLeftView = getLeftBar(isSetUp);
         mRightView = getRightBar(isSetUp);
+    }
+
+    private List<CarSystemBarView> getAllAvailableSystemBarViews() {
+        List<CarSystemBarView> barViews = new ArrayList<>();
+        if (mTopView != null) {
+            barViews.add(mTopView);
+        }
+        if (mBottomView != null) {
+            barViews.add(mBottomView);
+        }
+        if (mLeftView != null) {
+            barViews.add(mLeftView);
+        }
+        if (mRightView != null) {
+            barViews.add(mRightView);
+        }
+        return barViews;
     }
 }

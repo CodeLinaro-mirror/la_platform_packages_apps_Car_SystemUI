@@ -17,8 +17,10 @@
 package com.android.systemui.car.systembar;
 
 import android.annotation.IntDef;
+import android.annotation.Nullable;
 import android.content.Context;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,6 +37,7 @@ import com.android.systemui.statusbar.phone.StatusBarIconController;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
+import java.util.Set;
 
 /**
  * A custom system bar for the automotive use case.
@@ -48,6 +51,9 @@ public class CarSystemBarView extends LinearLayout {
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
     private @interface ButtonsType {
     }
+
+    private static final String TAG = CarSystemBarView.class.getSimpleName();
+    private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     public static final int BUTTON_TYPE_NAVIGATION = 0;
     public static final int BUTTON_TYPE_KEYGUARD = 1;
@@ -65,8 +71,8 @@ public class CarSystemBarView extends LinearLayout {
     private View mOcclusionButtons;
     private ViewGroup mQcEntryPointsContainer;
     private ViewGroup mReadOnlyIconsContainer;
-    // used to wire in open/close gestures for notifications
-    private OnTouchListener mStatusBarWindowTouchListener;
+    // used to wire in open/close gestures for overlay panels
+    private Set<OnTouchListener> mStatusBarWindowTouchListeners;
     private HvacPanelOverlayViewController mHvacPanelOverlayViewController;
 
     public CarSystemBarView(Context context, AttributeSet attrs) {
@@ -133,7 +139,7 @@ public class CarSystemBarView extends LinearLayout {
     // Used to forward touch events even if the touch was initiated from a child component
     @Override
     public boolean onInterceptTouchEvent(MotionEvent ev) {
-        if (mStatusBarWindowTouchListener != null) {
+        if (mStatusBarWindowTouchListeners != null && !mStatusBarWindowTouchListeners.isEmpty()) {
             if (!mButtonsDraggable) {
                 return false;
             }
@@ -141,8 +147,8 @@ public class CarSystemBarView extends LinearLayout {
                     : mNotificationsShadeController.isNotificationPanelOpen();
 
             // Forward touch events to the status bar window so it can drag
-            // windows if required (Notification shade)
-            mStatusBarWindowTouchListener.onTouch(this, ev);
+            // windows if required (ex. Notification shade)
+            triggerAllTouchListeners(this, ev);
 
             if (mConsumeTouchWhenPanelOpen && shouldConsumeEvent) {
                 return true;
@@ -172,28 +178,32 @@ public class CarSystemBarView extends LinearLayout {
     }
 
     /**
-     * Sets a touch listener that will be called from onInterceptTouchEvent and onTouchEvent
+     * Sets the touch listeners that will be called from onInterceptTouchEvent and onTouchEvent
      *
-     * @param statusBarWindowTouchListener The listener to call from touch and intercept touch
+     * @param statusBarWindowTouchListeners List of listeners to call from touch and intercept touch
      */
-    public void setStatusBarWindowTouchListener(OnTouchListener statusBarWindowTouchListener) {
-        mStatusBarWindowTouchListener = statusBarWindowTouchListener;
+    public void setStatusBarWindowTouchListeners(
+            Set<OnTouchListener> statusBarWindowTouchListeners) {
+        mStatusBarWindowTouchListeners = statusBarWindowTouchListeners;
     }
 
-    /** Gets the touch listener that will be called from onInterceptTouchEvent and onTouchEvent. */
-    public OnTouchListener getStatusBarWindowTouchListener() {
-        return mStatusBarWindowTouchListener;
+    /** Gets the touch listeners that will be called from onInterceptTouchEvent and onTouchEvent. */
+    public Set<OnTouchListener> getStatusBarWindowTouchListeners() {
+        return mStatusBarWindowTouchListeners;
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (mStatusBarWindowTouchListener != null) {
-            mStatusBarWindowTouchListener.onTouch(this, event);
-        }
+        triggerAllTouchListeners(this, event);
         return super.onTouchEvent(event);
     }
 
     protected void onNotificationsClick(View v) {
+        if (mNotificationsButton != null
+                && mNotificationsButton.getDisabled()) {
+            mNotificationsButton.runOnClickWhileDisabled();
+            return;
+        }
         if (mNotificationsShadeController != null) {
             mNotificationsShadeController.togglePanel();
         }
@@ -234,6 +244,33 @@ public class CarSystemBarView extends LinearLayout {
     }
 
     /**
+     * Sets the system bar view's disabled state and runnable when disabled.
+     */
+    public void setDisabledSystemBarButton(int viewId, boolean disabled, Runnable runnable,
+                @Nullable String buttonName) {
+        CarSystemBarButton button = findViewById(viewId);
+        if (button != null) {
+            if (DEBUG) {
+                Log.d(TAG, "setDisabledSystemBarButton for: " + buttonName + " to: " + disabled);
+            }
+            button.setDisabled(disabled, runnable);
+        }
+    }
+
+    /**
+     * Sets the system bar specific View container's visibility. ViewName is used just for
+     * debugging.
+     */
+    public void setVisibilityByViewId(int viewId, @Nullable String viewName,
+                @View.Visibility int visibility) {
+        View v = findViewById(viewId);
+        if (v != null) {
+            if (DEBUG) Log.d(TAG, "setVisibilityByViewId for: " + viewName + " to: " + visibility);
+            v.setVisibility(visibility);
+        }
+    }
+
+    /**
      * Sets the HvacPanelOverlayViewController and adds HVAC button listeners
      */
     public void registerHvacPanelOverlayViewController(HvacPanelOverlayViewController controller) {
@@ -243,21 +280,30 @@ public class CarSystemBarView extends LinearLayout {
         }
     }
 
-    private void setNavigationButtonsVisibility(int visibility) {
+    private void setNavigationButtonsVisibility(@View.Visibility int visibility) {
         if (mNavButtons != null) {
             mNavButtons.setVisibility(visibility);
         }
     }
 
-    private void setKeyguardButtonsVisibility(int visibility) {
+    private void setKeyguardButtonsVisibility(@View.Visibility int visibility) {
         if (mLockScreenButtons != null) {
             mLockScreenButtons.setVisibility(visibility);
         }
     }
 
-    private void setOcclusionButtonsVisibility(int visibility) {
+    private void setOcclusionButtonsVisibility(@View.Visibility int visibility) {
         if (mOcclusionButtons != null) {
             mOcclusionButtons.setVisibility(visibility);
+        }
+    }
+
+    private void triggerAllTouchListeners(View view, MotionEvent event) {
+        if (mStatusBarWindowTouchListeners == null) {
+            return;
+        }
+        for (OnTouchListener listener : mStatusBarWindowTouchListeners) {
+            listener.onTouch(view, event);
         }
     }
 

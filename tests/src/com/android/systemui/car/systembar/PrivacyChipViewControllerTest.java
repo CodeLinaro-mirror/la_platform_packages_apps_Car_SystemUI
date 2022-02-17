@@ -293,7 +293,7 @@ public class PrivacyChipViewControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void onReceive_setMicrophoneEnabledCalled() {
+    public void onUserUpdateReceive_setMicrophoneEnabledCalled() {
         when(mSensorPrivacyManager.isSensorPrivacyEnabled(MICROPHONE, /* userId= */ 1))
                 .thenReturn(true);
         mPrivacyChipViewController.addPrivacyChipView(mFrameLayout);
@@ -311,7 +311,7 @@ public class PrivacyChipViewControllerTest extends SysuiTestCase {
     }
 
     @Test
-    public void onEvent_setMicrophoneEnabledCalled() {
+    public void onUserChangeReceive_setMicrophoneEnabledCalled() {
         when(mSensorPrivacyManager.isSensorPrivacyEnabled(MICROPHONE, /* userId= */ 1))
                 .thenReturn(false);
         mPrivacyChipViewController.addPrivacyChipView(mFrameLayout);

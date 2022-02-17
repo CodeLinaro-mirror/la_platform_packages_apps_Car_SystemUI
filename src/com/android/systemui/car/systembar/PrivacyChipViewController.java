@@ -275,6 +275,7 @@ public class PrivacyChipViewController implements MicQcPanel.MicSensorInfoProvid
                 Log.e(TAG, "CarUserManager could not be obtained.");
             }
         });
+
         // Also register for user info changing
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_USER_INFO_CHANGED);

@@ -57,6 +57,7 @@ public class LocationStatusIconController extends StatusIconController {
             updateIconVisibilityForCurrentUser();
         }
     };
+
     private final CarUserManager.UserLifecycleListener mUserLifecycleListener =
             new CarUserManager.UserLifecycleListener() {
                 @Override
@@ -82,8 +83,8 @@ public class LocationStatusIconController extends StatusIconController {
 
         context.registerReceiverForAllUsers(mLocationReceiver, INTENT_FILTER_LOCATION_MODE_CHANGED,
                 /* broadcastPermission= */ null, /* scheduler= */ null);
-        setIconDrawableToDisplay(resources.getDrawable(R.drawable.ic_location, context.getTheme()));
         registerForUserChangeEvents();
+        setIconDrawableToDisplay(resources.getDrawable(R.drawable.ic_location, context.getTheme()));
         updateIconVisibilityForCurrentUser();
     }
 
