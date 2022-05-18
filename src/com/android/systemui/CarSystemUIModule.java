@@ -104,7 +104,8 @@ abstract class CarSystemUIModule {
             KeyguardBypassController bypassController,
             GroupMembershipManager groupManager,
             VisualStabilityProvider visualStabilityProvider,
-            ConfigurationController configurationController) {
+            ConfigurationController configurationController,
+            @Main Handler handler) {
         return new HeadsUpManagerPhone(
             context,
             headsUpManagerLogger,
@@ -112,7 +113,8 @@ abstract class CarSystemUIModule {
             bypassController,
             groupManager,
             visualStabilityProvider,
-            configurationController
+            configurationController,
+            handler
         );
     }
 
