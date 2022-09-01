@@ -28,6 +28,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
@@ -36,7 +37,10 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Provider;
 
@@ -53,8 +57,10 @@ public abstract class StatusIconGroupContainerController {
     private final ConfigurationController mConfigurationController;
     private final Map<Class<?>, Provider<StatusIconController>> mIconControllerCreators;
     private final String mIconTag;
-    private final @ColorInt int mIconNotHighlightedColor;
     private final String[] mStatusIconControllerNames;
+    private final Set<StatusIconPanelController> mStatusIconPanelControllers;
+    private Map<String, View> mStatusIconViewClassMap;
+    private @ColorInt int mIconNotHighlightedColor;
 
     public StatusIconGroupContainerController(
             Context context,
@@ -73,6 +79,8 @@ public abstract class StatusIconGroupContainerController {
         mIconNotHighlightedColor = mContext.getColor(R.color.status_icon_not_highlighted_color);
         mStatusIconControllerNames = mResources.getStringArray(
                 getStatusIconControllersStringArray());
+        mStatusIconViewClassMap = new HashMap<>();
+        mStatusIconPanelControllers = new HashSet<>();
     }
 
     private static <T> T resolve(String className, Map<Class<?>, Provider<T>> creators) {
@@ -106,11 +114,13 @@ public abstract class StatusIconGroupContainerController {
      */
     public void addIconViews(ViewGroup containerViewGroup, boolean shouldAttachPanel) {
         LayoutInflater li = LayoutInflater.from(mContext);
+        mIconNotHighlightedColor = mContext.getColor(R.color.status_icon_not_highlighted_color);
 
         for (String clsName : mStatusIconControllerNames) {
             StatusIconController statusIconController = getStatusIconControllerByName(clsName);
             View entryPointView = li.inflate(getButtonViewLayout(),
                     containerViewGroup, /* attachToRoot= */ false);
+            entryPointView.setId(statusIconController.getId());
 
             ImageView statusIconView = entryPointView.findViewWithTag(mIconTag);
             statusIconController.registerIconView(statusIconView);
@@ -123,9 +133,36 @@ public abstract class StatusIconGroupContainerController {
                 panelController.attachPanel(entryPointView,
                         statusIconController.getPanelContentLayout(),
                         statusIconController.getPanelWidth());
+                mStatusIconPanelControllers.add(panelController);
             }
             containerViewGroup.addView(entryPointView);
+            mStatusIconViewClassMap.put(clsName, entryPointView);
         }
+    }
+
+    /** Gets the class name of the selected View. */
+    public String getClassNameOfSelectedView() {
+        for (String clsName : mStatusIconViewClassMap.keySet()) {
+            View statusIconView = mStatusIconViewClassMap.get(clsName);
+            if (statusIconView.isSelected()) {
+                return clsName;
+            }
+        }
+        return null;
+    }
+
+    /** Gets the View corresponding to the given class name. */
+    public View getViewFromClassName(String clsName) {
+        return mStatusIconViewClassMap.getOrDefault(clsName, null);
+    }
+
+    /** Resets the cached Views. */
+    public void resetCache() {
+        for (StatusIconPanelController panelController : mStatusIconPanelControllers) {
+            panelController.destroyPanel();
+        }
+        mStatusIconPanelControllers.clear();
+        mStatusIconViewClassMap.clear();
     }
 
     @ArrayRes
@@ -152,4 +189,10 @@ public abstract class StatusIconGroupContainerController {
     private StatusIconController resolveStatusIconController(String className) {
         return resolve(className, mIconControllerCreators);
     }
+
+    @VisibleForTesting
+    public void setStatusIconViewClassMap(Map<String, View> statusIconViewClassMap) {
+        mStatusIconViewClassMap = statusIconViewClassMap;
+    }
+
 }
