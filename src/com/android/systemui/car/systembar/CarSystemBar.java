@@ -43,6 +43,7 @@ import android.view.WindowManager;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.internal.statusbar.IStatusBarService;
+import com.android.internal.statusbar.LetterboxDetails;
 import com.android.internal.statusbar.RegisterStatusBarResult;
 import com.android.internal.view.AppearanceRegion;
 import com.android.systemui.CoreStartable;
@@ -53,8 +54,8 @@ import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.plugins.DarkIconDispatcher;
-import com.android.systemui.shared.system.ActivityManagerWrapper;
 import com.android.systemui.shared.system.TaskStackChangeListener;
+import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.systemui.statusbar.AutoHideUiElement;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.phone.AutoHideController;
@@ -98,7 +99,6 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
     private final SystemBarConfigs mSystemBarConfigs;
 
     private StatusBarSignalPolicy mSignalPolicy;
-    private ActivityManagerWrapper mActivityManagerWrapper;
 
     // If the nav bar should be hidden when the soft keyboard is visible.
     private boolean mHideTopBarForKeyboard;
@@ -199,7 +199,7 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
 
         onSystemBarAttributesChanged(mDisplayId, result.mAppearance, result.mAppearanceRegions,
                 result.mNavbarColorManagedByIme, result.mBehavior, result.mRequestedVisibilities,
-                result.mPackageName);
+                result.mPackageName, result.mLetterboxDetails);
 
         // StatusBarManagerService has a back up of IME token and it's restored here.
         setImeWindowStatus(mDisplayId, result.mImeToken, result.mImeWindowVis,
@@ -267,9 +267,10 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
 
         createSystemBar(result);
 
-        mActivityManagerWrapper = ActivityManagerWrapper.getInstance();
-        mActivityManagerWrapper.registerTaskStackListener(mButtonSelectionStateListener);
-        mActivityManagerWrapper.registerTaskStackListener(new TaskStackChangeListener() {
+        TaskStackChangeListeners.getInstance().registerTaskStackListener(
+                mButtonSelectionStateListener);
+        TaskStackChangeListeners.getInstance().registerTaskStackListener(
+                new TaskStackChangeListener() {
             @Override
             public void onLockTaskModeChanged(int mode) {
                 mCarSystemBarController.refreshSystemBar();
@@ -476,7 +477,8 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
             boolean navbarColorManagedByIme,
             @WindowInsetsController.Behavior int behavior,
             InsetsVisibilities requestedVisibilities,
-            String packageName) {
+            String packageName,
+            LetterboxDetails[] letterboxDetails) {
         if (displayId != mDisplayId) {
             return;
         }
