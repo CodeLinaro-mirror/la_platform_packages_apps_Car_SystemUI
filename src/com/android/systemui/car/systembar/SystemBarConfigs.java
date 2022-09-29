@@ -25,6 +25,7 @@ import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.InsetsFrameProvider;
 import android.view.InsetsState;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -317,15 +318,15 @@ public class SystemBarConfigs {
         if (mBottomNavBarEnabled) {
             boolean actual = mResources.getBoolean(R.bool.config_hideBottomSystemBarForKeyboard);
             boolean expected = mResources.getBoolean(
-                    com.android.internal.R.bool.config_automotiveHideNavBarForKeyboard);
+                    com.android.internal.R.bool.config_hideNavBarForKeyboard);
 
             if (actual != expected) {
                 throw new RuntimeException("config_hideBottomSystemBarForKeyboard must not be "
                         + "overlaid directly and should always refer to"
-                        + "config_automotiveHideNavBarForKeyboard. However, their values "
+                        + "config_hideNavBarForKeyboard. However, their values "
                         + "currently do not sync. Set config_hideBottomSystemBarForKeyguard to "
-                        + "@*android:bool/config_automotiveHideNavBarForKeyboard. To change its "
-                        + "value, overlay config_automotiveHideNavBarForKeyboard in "
+                        + "@*android:bool/config_hideNavBarForKeyboard. To change its "
+                        + "value, overlay config_hideNavBarForKeyboard in "
                         + "framework/base/core/res/res.");
             }
         }
@@ -459,7 +460,10 @@ public class SystemBarConfigs {
                             | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH,
                     PixelFormat.TRANSLUCENT);
             lp.setTitle(BAR_TITLE_MAP.get(mSide));
-            lp.providesInsetsTypes = new int[]{BAR_TYPE_MAP[mBarType], BAR_GESTURE_MAP.get(mSide)};
+            lp.providedInsets = new InsetsFrameProvider[] {
+                new InsetsFrameProvider(BAR_TYPE_MAP[mBarType]),
+                new InsetsFrameProvider(BAR_GESTURE_MAP.get(mSide))
+            };
             lp.setFitInsetsTypes(0);
             lp.windowAnimations = 0;
             lp.gravity = BAR_GRAVITY_MAP.get(mSide);
