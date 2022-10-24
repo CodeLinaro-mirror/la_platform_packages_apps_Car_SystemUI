@@ -45,12 +45,12 @@ import com.android.systemui.car.window.SystemUIOverlayWindowController;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.shade.NotificationPanelViewController;
+import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.statusbar.phone.BiometricUnlockController;
 import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.KeyguardBouncer;
 import com.android.systemui.statusbar.phone.KeyguardBouncer.Factory;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
-import com.android.systemui.statusbar.phone.panelstate.PanelExpansionStateManager;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.toast.SystemUIToast;
 import com.android.systemui.toast.ToastFactory;
@@ -281,11 +281,6 @@ public class CarKeyguardViewController extends OverlayViewController implements
     }
 
     @Override
-    public boolean isShowing() {
-        return mShowing;
-    }
-
-    @Override
     @MainThread
     public void dismissAndCollapse() {
         // If dismissing and collapsing Keyguard is requested (e.g. by a Keyguard-dismissing
@@ -397,7 +392,7 @@ public class CarKeyguardViewController extends OverlayViewController implements
     public void registerCentralSurfaces(
             CentralSurfaces centralSurfaces,
             NotificationPanelViewController notificationPanelViewController,
-            PanelExpansionStateManager panelExpansionStateManager,
+            ShadeExpansionStateManager shadeExpansionStateManager,
             BiometricUnlockController biometricUnlockController,
             View notificationContainer,
             KeyguardBypassController bypassController) {
@@ -446,7 +441,6 @@ public class CarKeyguardViewController extends OverlayViewController implements
     }
 
     private void notifyKeyguardUpdateMonitor() {
-        mKeyguardUpdateMonitor.onKeyguardVisibilityChanged(mShowing);
         if (mBouncer != null) {
             mKeyguardUpdateMonitor.sendKeyguardBouncerChanged(
                     bouncerIsOrWillBeShowing(), isBouncerShowing());
