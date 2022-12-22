@@ -34,9 +34,9 @@ import android.inputmethodservice.InputMethodService;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.view.Display;
-import android.view.InsetsVisibilities;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 
@@ -77,8 +77,9 @@ import javax.inject.Inject;
 import dagger.Lazy;
 
 /** Navigation bars customized for the automotive use case. */
-public class CarSystemBar extends CoreStartable implements CommandQueue.Callbacks,
+public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
         ConfigurationController.ConfigurationListener {
+    private final Context mContext;
     private final CarSystemBarController mCarSystemBarController;
     private final SysuiDarkIconDispatcher mStatusBarIconController;
     private final WindowManager mWindowManager;
@@ -154,7 +155,7 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
             SystemBarConfigs systemBarConfigs,
             ConfigurationController configurationController
     ) {
-        super(context);
+        mContext = context;
         mCarSystemBarController = carSystemBarController;
         mStatusBarIconController = (SysuiDarkIconDispatcher) darkIconDispatcher;
         mWindowManager = windowManager;
@@ -198,7 +199,7 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
         }
 
         onSystemBarAttributesChanged(mDisplayId, result.mAppearance, result.mAppearanceRegions,
-                result.mNavbarColorManagedByIme, result.mBehavior, result.mRequestedVisibilities,
+                result.mNavbarColorManagedByIme, result.mBehavior, result.mRequestedVisibleTypes,
                 result.mPackageName, result.mLetterboxDetails);
 
         // StatusBarManagerService has a back up of IME token and it's restored here.
@@ -476,7 +477,7 @@ public class CarSystemBar extends CoreStartable implements CommandQueue.Callback
             AppearanceRegion[] appearanceRegions,
             boolean navbarColorManagedByIme,
             @WindowInsetsController.Behavior int behavior,
-            InsetsVisibilities requestedVisibilities,
+            @InsetsType int requestedVisibleTypes,
             String packageName,
             LetterboxDetails[] letterboxDetails) {
         if (displayId != mDisplayId) {

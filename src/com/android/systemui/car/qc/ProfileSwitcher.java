@@ -43,6 +43,7 @@ import android.sysprop.CarProperties;
 import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -57,11 +58,15 @@ import com.android.car.qc.provider.BaseLocalQCProvider;
 import com.android.internal.util.UserIcons;
 import com.android.settingslib.utils.StringUtil;
 import com.android.systemui.R;
+import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.car.userswitcher.UserIconProvider;
+import com.android.systemui.settings.UserTracker;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+
+import javax.inject.Inject;
 
 /**
  * Local provider for the profile switcher panel.
@@ -70,15 +75,18 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
     private static final String TAG = ProfileSwitcher.class.getSimpleName();
     private static final int TIMEOUT_MS = CarProperties.user_hal_timeout().orElse(5_000) + 500;
 
+    protected final UserTracker mUserTracker;
+    protected final UserIconProvider mUserIconProvider;
     private final UserManager mUserManager;
     private final DevicePolicyManager mDevicePolicyManager;
-    private final UserIconProvider mUserIconProvider;
     private final Car mCar;
     private final CarUserManager mCarUserManager;
-    private boolean mPendingUserAdd;
+    protected boolean mPendingUserAdd;
 
-    public ProfileSwitcher(Context context) {
+    @Inject
+    public ProfileSwitcher(Context context, UserTracker userTracker) {
         super(context);
+        mUserTracker = userTracker;
         mUserManager = context.getSystemService(UserManager.class);
         mDevicePolicyManager = context.getSystemService(DevicePolicyManager.class);
         mUserIconProvider = new UserIconProvider();
@@ -87,9 +95,10 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
     }
 
     @VisibleForTesting
-    ProfileSwitcher(Context context, UserManager userManager,
+    ProfileSwitcher(Context context, UserTracker userTracker, UserManager userManager,
             DevicePolicyManager devicePolicyManager, CarUserManager carUserManager) {
         super(context);
+        mUserTracker = userTracker;
         mUserManager = userManager;
         mDevicePolicyManager = devicePolicyManager;
         mUserIconProvider = new UserIconProvider();
@@ -109,11 +118,11 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
         boolean isLogoutEnabled = mDevicePolicyManager.isLogoutEnabled()
                 && mDevicePolicyManager.getLogoutUser() != null;
 
-        int fgUserId = ActivityManager.getCurrentUser();
+        int fgUserId = mUserTracker.getUserId();
         UserHandle fgUserHandle = UserHandle.of(fgUserId);
         // If the foreground user CANNOT switch to other users, only display the foreground user.
         if (mUserManager.getUserSwitchability(fgUserHandle) != SWITCHABILITY_STATUS_OK) {
-            UserInfo currentUser = mUserManager.getUserInfo(ActivityManager.getCurrentUser());
+            UserInfo currentUser = mUserManager.getUserInfo(mUserTracker.getUserId());
             listBuilder.addRow(createUserProfileRow(currentUser));
             if (isLogoutEnabled) {
                 listBuilder.addRow(createLogOutRow());
@@ -148,6 +157,7 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
         return mUserManager.getAliveUsers()
                 .stream()
                 .filter(userInfo -> userInfo.supportsSwitchToByUser() && !userInfo.isGuest())
+                .sorted((u1, u2) -> Long.signum(u1.creationTime - u2.creationTime))
                 .collect(Collectors.toList());
     }
 
@@ -163,7 +173,7 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
             public void onAction(@NonNull QCItem item, @NonNull Context context,
                     @NonNull Intent intent) {
                 mContext.startActivityAsUser(new Intent(ACTION_ENTERPRISE_PRIVACY_SETTINGS),
-                        UserHandle.CURRENT);
+                        mUserTracker.getUserHandle());
             }
 
             @Override
@@ -174,7 +184,7 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
         return row;
     }
 
-    private QCRow createUserProfileRow(UserInfo userInfo) {
+    protected QCRow createUserProfileRow(UserInfo userInfo) {
         QCItem.ActionHandler actionHandler = (item, context, intent) -> {
             if (mPendingUserAdd) {
                 return;
@@ -240,9 +250,30 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
         return row;
     }
 
-    private void switchUser(@UserIdInt int userId) {
+    protected void switchUser(@UserIdInt int userId) {
         mContext.sendBroadcastAsUser(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS),
-                UserHandle.CURRENT);
+                mUserTracker.getUserHandle());
+        if (mUserTracker.getUserId() == userId) {
+            return;
+        }
+        if (mUserManager.isUsersOnSecondaryDisplaysSupported()) {
+            if (mUserManager.getVisibleUsers().stream().anyMatch(
+                    userHandle -> userHandle.getIdentifier() == userId)) {
+                // TODO_MD - finalize behavior for non-switchable users
+                Toast.makeText(mContext,
+                        "Cannot switch to user already running on another display.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            if (CarSystemUIUserUtil.isSecondaryMUMDSystemUI(mContext)) {
+                switchSecondaryUser(userId);
+                return;
+            }
+        }
+        switchForegroundUser(userId);
+    }
+
+    private void switchForegroundUser(@UserIdInt int userId) {
         AsyncFuture<UserSwitchResult> userSwitchResultFuture =
                 mCarUserManager.switchUser(userId);
         UserSwitchResult userSwitchResult;
@@ -259,9 +290,19 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
         }
     }
 
+    private void switchSecondaryUser(@UserIdInt int userId) {
+        ActivityManager am = mContext.getSystemService(ActivityManager.class);
+        boolean success = am.stopUser(mUserTracker.getUserId(), /* force= */ true);
+        if (!success) {
+            Log.w(TAG, "Cound not stop user " + userId);
+            return;
+        }
+        am.startUserInBackgroundOnSecondaryDisplay(userId, mContext.getDisplayId());
+    }
+
     private void logoutUser() {
         mContext.sendBroadcastAsUser(new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS),
-                UserHandle.CURRENT);
+                mUserTracker.getUserHandle());
         AsyncFuture<UserSwitchResult> userSwitchResultFuture = mCarUserManager.logoutUser();
         UserSwitchResult userSwitchResult;
         try {
@@ -350,7 +391,7 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
                 com.android.internal.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(R.string.profile_limit_reached_title)
                 .setMessage(StringUtil.getIcuPluralsString(mContext, getMaxSupportedRealUsers(),
-                                R.string.profile_limit_reached_message))
+                        R.string.profile_limit_reached_message))
                 .setPositiveButton(android.R.string.ok, null)
                 .create();
         // Sets window flags for the SysUI dialog

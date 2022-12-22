@@ -32,6 +32,7 @@ import android.hardware.display.DisplayManager;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Slog;
@@ -53,6 +54,7 @@ import java.util.List;
  * Additional information on blocked Activity should be passed as intent extras.
  */
 public class ActivityBlockingActivity extends Activity {
+    private static final int ACTIVITY_MONITORING_DELAY_MS = 1000;
     private static final String TAG = "BlockingActivity";
     private static final int EGL_CONTEXT_VERSION = 3;
     private static final int EGL_CONFIG_SIZE = 8;
@@ -72,6 +74,7 @@ public class ActivityBlockingActivity extends Activity {
     private Button mToggleDebug;
 
     private int mBlockedTaskId;
+    private final Handler mHandler = new Handler();
 
     private final View.OnClickListener mOnExitButtonClickedListener =
             v -> {
@@ -145,9 +148,8 @@ public class ActivityBlockingActivity extends Activity {
         String blockedActivity = getIntent().getStringExtra(
                 CarPackageManager.BLOCKING_INTENT_EXTRA_BLOCKED_ACTIVITY_NAME);
         if (!TextUtils.isEmpty(blockedActivity)) {
-            if (isTopActivityBehindAbaDistractionOptimized()) {
-                Slog.e(TAG, "Top activity is already DO, so finishing");
-                finish();
+            boolean finished = finishIfActivitiesAreDistractionOptimised();
+            if (finished) {
                 return;
             }
 
@@ -178,6 +180,17 @@ public class ActivityBlockingActivity extends Activity {
         // Finish when blocking activity goes invisible to avoid it accidentally re-surfaces with
         // stale string regarding blocked activity.
         finish();
+    }
+
+    private boolean finishIfActivitiesAreDistractionOptimised() {
+        if (areAllVisibleActivitiesDistractionOptimised()) {
+            Slog.i(TAG, "All visible activities are already DO, so finishing");
+            finish();
+            return true;
+        }
+        mHandler.postDelayed(() -> finishIfActivitiesAreDistractionOptimised(),
+                ACTIVITY_MONITORING_DELAY_MS);
+        return false;
     }
 
     private void setupGLSurface() {
@@ -257,49 +270,40 @@ public class ActivityBlockingActivity extends Activity {
 
     /**
      * It is possible that the stack info has changed between when the intent to launch this
-     * activity was initiated and when this activity is started. Check whether the activity behind
-     * the ABA is distraction optimized.
+     * activity was initiated and when this activity is started. Check whether all the visible
+     * activities are distraction optimized.
      */
-    private boolean isTopActivityBehindAbaDistractionOptimized() {
-        List<ActivityManager.RunningTaskInfo> taskInfosTopToBottom;
-        taskInfosTopToBottom = mCarActivityManager.getVisibleTasks();
-        ActivityManager.RunningTaskInfo topStackBehindAba = null;
-
-        // Iterate in bottom to top manner
-        for (int i = taskInfosTopToBottom.size() - 1; i >= 0; i--) {
-            ActivityManager.RunningTaskInfo taskInfo = taskInfosTopToBottom.get(i);
+    private boolean areAllVisibleActivitiesDistractionOptimised() {
+        List<ActivityManager.RunningTaskInfo> visibleTasks;
+        visibleTasks = mCarActivityManager.getVisibleTasks();
+        for (int i = visibleTasks.size() - 1; i >= 0; i--) {
+            ActivityManager.RunningTaskInfo taskInfo = visibleTasks.get(i);
             if (taskInfo.displayId != getDisplayId()) {
                 // ignore stacks on other displays
                 continue;
             }
 
             if (getComponentName().equals(taskInfo.topActivity)) {
-                // quit when stack with the blocking activity is encountered because the last seen
-                // task will be the topStackBehindAba.
-                break;
+                // skip the ActivityBlockingActivity itself
+                continue;
             }
 
-            topStackBehindAba = taskInfo;
-        }
-
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Slog.d(TAG, String.format("Top stack behind ABA is: %s", topStackBehindAba));
-        }
-
-        if (topStackBehindAba != null && topStackBehindAba.topActivity != null) {
-            boolean isDo = mCarPackageManager.isActivityDistractionOptimized(
-                    topStackBehindAba.topActivity.getPackageName(),
-                    topStackBehindAba.topActivity.getClassName());
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Slog.d(TAG,
-                        String.format("Top activity (%s) is DO: %s", topStackBehindAba.topActivity,
-                                isDo));
+            if (taskInfo.topActivity != null) {
+                boolean isDo = mCarPackageManager.isActivityDistractionOptimized(
+                        taskInfo.topActivity.getPackageName(),
+                        taskInfo.topActivity.getClassName());
+                if (Log.isLoggable(TAG, Log.DEBUG)) {
+                    Slog.d(TAG,
+                            String.format("Activity (%s) is DO: %s", taskInfo.topActivity, isDo));
+                }
+                if (!isDo) {
+                    return false;
+                }
             }
-            return isDo;
         }
 
-        // unknown top stack / activity, default to considering it non-DO
-        return false;
+        // No visible non-DO activity found.
+        return true;
     }
 
     private void displayDebugInfo() {
@@ -375,6 +379,7 @@ public class ActivityBlockingActivity extends Activity {
             mToggleDebug.getViewTreeObserver().removeOnGlobalLayoutListener(
                     mOnGlobalLayoutListener);
         }
+        mHandler.removeCallbacksAndMessages(null);
         mCar.disconnect();
     }
 

@@ -45,7 +45,6 @@ import android.os.Debug;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
-import android.os.UserHandle;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -65,6 +64,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.systemui.R;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.plugins.VolumeDialog;
+import com.android.systemui.settings.UserTracker;
+import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.volume.Events;
 import com.android.systemui.volume.SystemUIInterpolators;
 import com.android.systemui.volume.VolumeDialogImpl;
@@ -80,7 +81,8 @@ import java.util.List;
  *
  * Methods ending in "H" must be called on the (ui) handler.
  */
-public class CarVolumeDialogImpl implements VolumeDialog {
+public class CarVolumeDialogImpl
+        implements VolumeDialog, ConfigurationController.ConfigurationListener {
 
     private static final String TAG = "CarVolumeDialog";
     private static final boolean DEBUG = Build.IS_USERDEBUG || Build.IS_ENG;
@@ -105,6 +107,8 @@ public class CarVolumeDialogImpl implements VolumeDialog {
     private final int mExpNormalTimeout;
     private final int mExpHoveringTimeout;
     private final CarServiceProvider mCarServiceProvider;
+    private final ConfigurationController mConfigurationController;
+    private final UserTracker mUserTracker;
 
     private Window mWindow;
     private CustomDialog mDialog;
@@ -117,6 +121,7 @@ public class CarVolumeDialogImpl implements VolumeDialog {
     private boolean mDismissing;
     private boolean mExpanded;
     private View mExpandIcon;
+    private boolean mHomeButtonPressedBroadcastReceiverRegistered;
 
     private final CarAudioManager.CarVolumeCallback mVolumeChangeCallback =
             new CarAudioManager.CarVolumeCallback() {
@@ -194,9 +199,28 @@ public class CarVolumeDialogImpl implements VolumeDialog {
         }
     };
 
-    public CarVolumeDialogImpl(Context context, CarServiceProvider carServiceProvider) {
+    private final UserTracker.Callback mUserTrackerCallback = new UserTracker.Callback() {
+        @Override
+        public void onUserChanged(int newUser, Context userContext) {
+            if (mHomeButtonPressedBroadcastReceiverRegistered) {
+                mContext.unregisterReceiver(mHomeButtonPressedBroadcastReceiver);
+                mContext.registerReceiverAsUser(mHomeButtonPressedBroadcastReceiver,
+                        mUserTracker.getUserHandle(),
+                        new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS),
+                        /* broadcastPermission= */ null, /* scheduler= */ null,
+                        Context.RECEIVER_EXPORTED);
+            }
+        }
+    };
+
+    public CarVolumeDialogImpl(
+            Context context,
+            CarServiceProvider carServiceProvider,
+            ConfigurationController configurationController,
+            UserTracker userTracker) {
         mContext = context;
         mCarServiceProvider = carServiceProvider;
+        mUserTracker = userTracker;
         mKeyguard = (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
         mNormalTimeout = mContext.getResources().getInteger(
                 R.integer.car_volume_dialog_display_normal_timeout);
@@ -206,6 +230,7 @@ public class CarVolumeDialogImpl implements VolumeDialog {
                 R.integer.car_volume_dialog_display_expanded_normal_timeout);
         mExpHoveringTimeout = mContext.getResources().getInteger(
                 R.integer.car_volume_dialog_display_expanded_hovering_timeout);
+        mConfigurationController = configurationController;
     }
 
     private static int getSeekbarValue(CarAudioManager carAudioManager, int volumeGroupId) {
@@ -232,18 +257,32 @@ public class CarVolumeDialogImpl implements VolumeDialog {
         initDialog();
         mCarServiceProvider.addListener(mCarServiceOnConnectedListener);
 
-        mContext.registerReceiverAsUser(mHomeButtonPressedBroadcastReceiver, UserHandle.CURRENT,
-                new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), /* broadcastPermission= */
-                null, /* scheduler= */ null, Context.RECEIVER_EXPORTED);
+        mContext.registerReceiverAsUser(mHomeButtonPressedBroadcastReceiver,
+                mUserTracker.getUserHandle(), new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS),
+                /* broadcastPermission= */ null, /* scheduler= */ null, Context.RECEIVER_EXPORTED);
+        mHomeButtonPressedBroadcastReceiverRegistered = true;
+        mUserTracker.addCallback(mUserTrackerCallback, mContext.getMainExecutor());
+        mConfigurationController.addCallback(this);
     }
 
     @Override
     public void destroy() {
         mHandler.removeCallbacksAndMessages(/* token= */ null);
 
+        mUserTracker.removeCallback(mUserTrackerCallback);
         mContext.unregisterReceiver(mHomeButtonPressedBroadcastReceiver);
+        mHomeButtonPressedBroadcastReceiverRegistered = false;
 
         cleanupAudioManager();
+        mConfigurationController.removeCallback(this);
+    }
+
+    @Override
+    public void onLayoutDirectionChanged(boolean isLayoutRtl) {
+        if (mListView != null) {
+            mListView.setLayoutDirection(
+                    isLayoutRtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+        }
     }
 
     /**

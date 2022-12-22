@@ -72,7 +72,7 @@ public class SystemBarConfigs {
         NOTE: The elements' order in the map below must be preserved as-is since the correct
         corresponding values are obtained by the index.
      */
-    private static final int[] BAR_TYPE_MAP = {
+    public static final int[] BAR_TYPE_MAP = {
             InsetsState.ITYPE_STATUS_BAR,
             InsetsState.ITYPE_NAVIGATION_BAR,
             InsetsState.ITYPE_CLIMATE_BAR,
@@ -359,7 +359,7 @@ public class SystemBarConfigs {
     @InsetsState.InternalInsetsType
     private int getSystemBarTypeBySide(@SystemBarSide int side) {
         return mSystemBarConfigMap.get(side) != null
-                ? mSystemBarConfigMap.get(side).getBarType() : null;
+                ? mSystemBarConfigMap.get(side).getBarType() : InsetsState.ITYPE_INVALID;
     }
 
     // On init, system bars are visible as long as they are enabled.

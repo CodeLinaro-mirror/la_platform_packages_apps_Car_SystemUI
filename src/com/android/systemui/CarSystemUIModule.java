@@ -22,30 +22,29 @@ import static com.android.systemui.Dependency.LEAK_REPORT_EMAIL_NAME;
 import android.content.Context;
 import android.hardware.SensorPrivacyManager;
 import android.os.Handler;
-import android.os.PowerManager;
 import android.window.DisplayAreaOrganizer;
 
 import com.android.internal.logging.UiEventLogger;
 import com.android.keyguard.KeyguardViewController;
-import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedControllerImpl;
+import com.android.systemui.car.decor.CarPrivacyChipDecorProviderFactory;
+import com.android.systemui.car.decor.CarPrivacyChipViewController;
 import com.android.systemui.car.keyguard.CarKeyguardViewController;
 import com.android.systemui.car.notification.NotificationShadeWindowControllerImpl;
 import com.android.systemui.car.statusbar.DozeServiceHost;
+import com.android.systemui.car.users.CarMultiUserUtilsModule;
 import com.android.systemui.car.volume.CarVolumeModule;
 import com.android.systemui.dagger.GlobalRootComponent;
 import com.android.systemui.dagger.SysUISingleton;
-import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
-import com.android.systemui.demomode.DemoModeController;
+import com.android.systemui.decor.PrivacyDotDecorProviderFactory;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.dock.DockManagerImpl;
 import com.android.systemui.doze.DozeHost;
 import com.android.systemui.navigationbar.gestural.GestureModule;
 import com.android.systemui.plugins.qs.QSFactory;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
-import com.android.systemui.power.EnhancedEstimates;
 import com.android.systemui.power.dagger.PowerModule;
 import com.android.systemui.qs.dagger.QSModule;
 import com.android.systemui.qs.tileimpl.QSFactoryImpl;
@@ -54,19 +53,18 @@ import com.android.systemui.recents.RecentsImplementation;
 import com.android.systemui.screenshot.ReferenceScreenshotModule;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.shade.ShadeControllerImpl;
+import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationLockscreenUserManagerImpl;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
-import com.android.systemui.statusbar.notification.NotificationEntryManager;
+import com.android.systemui.statusbar.events.PrivacyDotViewController;
 import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
 import com.android.systemui.statusbar.phone.HeadsUpManagerPhone;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
-import com.android.systemui.statusbar.phone.KeyguardEnvironmentImpl;
 import com.android.systemui.statusbar.policy.AccessibilityManagerWrapper;
-import com.android.systemui.statusbar.policy.BatteryController;
-import com.android.systemui.statusbar.policy.BatteryControllerImpl;
+import com.android.systemui.statusbar.policy.AospPolicyModule;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.HeadsUpManager;
@@ -86,12 +84,15 @@ import dagger.Provides;
 
 @Module(
         includes = {
+                AospPolicyModule.class,
+                CarMultiUserUtilsModule.class,
                 CarVolumeModule.class,
                 GestureModule.class,
                 PowerModule.class,
                 QSModule.class,
                 ReferenceScreenshotModule.class
-        })
+        }
+)
 abstract class CarSystemUIModule {
 
     @SysUISingleton
@@ -113,18 +114,20 @@ abstract class CarSystemUIModule {
             ConfigurationController configurationController,
             @Main Handler handler,
             AccessibilityManagerWrapper accessibilityManagerWrapper,
-            UiEventLogger uiEventLogger) {
+            UiEventLogger uiEventLogger,
+            ShadeExpansionStateManager shadeExpansionStateManager) {
         return new HeadsUpManagerPhone(
-            context,
-            headsUpManagerLogger,
-            statusBarStateController,
-            bypassController,
-            groupManager,
-            visualStabilityProvider,
-            configurationController,
-            handler,
-            accessibilityManagerWrapper,
-            uiEventLogger
+                context,
+                headsUpManagerLogger,
+                statusBarStateController,
+                bypassController,
+                groupManager,
+                visualStabilityProvider,
+                configurationController,
+                handler,
+                accessibilityManagerWrapper,
+                uiEventLogger,
+                shadeExpansionStateManager
         );
     }
 
@@ -157,19 +160,6 @@ abstract class CarSystemUIModule {
 
     @Provides
     @SysUISingleton
-    static BatteryController provideBatteryController(Context context,
-            EnhancedEstimates enhancedEstimates, PowerManager powerManager,
-            BroadcastDispatcher broadcastDispatcher, DemoModeController demoModeController,
-            @Main Handler mainHandler,
-            @Background Handler bgHandler) {
-        BatteryController bC = new BatteryControllerImpl(context, enhancedEstimates, powerManager,
-                broadcastDispatcher, demoModeController, mainHandler, bgHandler);
-        bC.init();
-        return bC;
-    }
-
-    @Provides
-    @SysUISingleton
     static SensorPrivacyController provideSensorPrivacyController(
             SensorPrivacyManager sensorPrivacyManager) {
         SensorPrivacyController spC = new SensorPrivacyControllerImpl(sensorPrivacyManager);
@@ -195,10 +185,6 @@ abstract class CarSystemUIModule {
     abstract DockManager bindDockManager(DockManagerImpl dockManager);
 
     @Binds
-    abstract NotificationEntryManager.KeyguardEnvironment bindKeyguardEnvironment(
-            KeyguardEnvironmentImpl keyguardEnvironment);
-
-    @Binds
     abstract ShadeController provideShadeController(ShadeControllerImpl shadeController);
 
     @Binds
@@ -218,7 +204,7 @@ abstract class CarSystemUIModule {
             CarDeviceProvisionedControllerImpl deviceProvisionedController) {
         deviceProvisionedController.init();
         return deviceProvisionedController;
-    };
+    }
 
     @Binds
     abstract CarDeviceProvisionedController bindCarDeviceProvisionedController(
@@ -226,4 +212,12 @@ abstract class CarSystemUIModule {
 
     @Binds
     abstract DozeHost bindDozeHost(DozeServiceHost dozeServiceHost);
+
+    @Binds
+    abstract PrivacyDotViewController providePrivacyDotViewController(
+            CarPrivacyChipViewController carPrivacyChipViewController);
+
+    @Binds
+    abstract PrivacyDotDecorProviderFactory providePrivacyDotDecorProviderFactory(
+            CarPrivacyChipDecorProviderFactory carPrivacyDotDecorProviderFactory);
 }
