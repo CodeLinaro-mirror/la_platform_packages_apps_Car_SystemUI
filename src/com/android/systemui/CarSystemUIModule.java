@@ -25,6 +25,7 @@ import android.hardware.SensorPrivacyManager;
 import android.window.DisplayAreaOrganizer;
 
 import com.android.keyguard.KeyguardViewController;
+import com.android.keyguard.dagger.KeyguardDisplayModule;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedControllerImpl;
 import com.android.systemui.car.decor.CarPrivacyChipDecorProviderFactory;
@@ -58,7 +59,6 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationLockscreenUserManagerImpl;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
-import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.policy.AospPolicyModule;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.HeadsUpEmptyImplModule;
@@ -90,8 +90,8 @@ import javax.inject.Named;
                 ReferenceScreenshotModule.class,
                 ShadeEmptyImplModule.class,
                 ShutdownUiModule.class,
-                StatusBarEventsModule.class,
-                DriveModeModule.class
+                DriveModeModule.class,
+                KeyguardDisplayModule.class,
         }
 )
 abstract class CarSystemUIModule {
