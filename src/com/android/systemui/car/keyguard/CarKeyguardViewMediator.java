@@ -36,12 +36,14 @@ import com.android.systemui.keyguard.DismissCallbackRegistry;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.navigationbar.NavigationModeController;
+import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.phone.DozeParameters;
 import com.android.systemui.statusbar.phone.ScreenOffAnimationController;
+import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.util.DeviceConfigProxy;
@@ -61,6 +63,7 @@ public class CarKeyguardViewMediator extends KeyguardViewMediator {
      * Injected constructor. See {@link CarKeyguardModule}.
      */
     public CarKeyguardViewMediator(Context context,
+            UserTracker userTracker,
             FalsingCollector falsingCollector,
             LockPatternUtils lockPatternUtils,
             BroadcastDispatcher broadcastDispatcher,
@@ -85,8 +88,9 @@ public class CarKeyguardViewMediator extends KeyguardViewMediator {
             DreamOverlayStateController dreamOverlayStateController,
             Lazy<ShadeController> mShadeControllerLazy,
             Lazy<NotificationShadeWindowController> notificationShadeWindowControllerLazy,
-            Lazy<ActivityLaunchAnimator> activityLaunchAnimator) {
-        super(context, falsingCollector, lockPatternUtils, broadcastDispatcher,
+            Lazy<ActivityLaunchAnimator> activityLaunchAnimator,
+            Lazy<ScrimController> scrimControllerLazy) {
+        super(context, userTracker, falsingCollector, lockPatternUtils, broadcastDispatcher,
                 statusBarKeyguardViewManagerLazy, dismissCallbackRegistry, keyguardUpdateMonitor,
                 dumpManager, uiBgExecutor, powerManager, trustManager, userSwitcherController,
                 deviceConfig, navigationModeController, keyguardDisplayManager, dozeParameters,
@@ -96,7 +100,8 @@ public class CarKeyguardViewMediator extends KeyguardViewMediator {
                 dreamOverlayStateController,
                 mShadeControllerLazy,
                 notificationShadeWindowControllerLazy,
-                activityLaunchAnimator);
+                activityLaunchAnimator,
+                scrimControllerLazy);
         mContext = context;
     }
 
