@@ -156,7 +156,8 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
     private List<UserInfo> getProfileList() {
         return mUserManager.getAliveUsers()
                 .stream()
-                .filter(userInfo -> userInfo.supportsSwitchToByUser() && !userInfo.isGuest())
+                .filter(userInfo -> userInfo.supportsSwitchTo() && userInfo.isFull()
+                        && !userInfo.isGuest())
                 .sorted((u1, u2) -> Long.signum(u1.creationTime - u2.creationTime))
                 .collect(Collectors.toList());
     }
@@ -265,7 +266,7 @@ public class ProfileSwitcher extends BaseLocalQCProvider {
                         Toast.LENGTH_LONG).show();
                 return;
             }
-            if (CarSystemUIUserUtil.isSecondaryMUMDSystemUI(mContext)) {
+            if (CarSystemUIUserUtil.isSecondaryMUMDSystemUI()) {
                 switchSecondaryUser(userId);
                 return;
             }

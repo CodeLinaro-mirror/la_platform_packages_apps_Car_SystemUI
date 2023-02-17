@@ -17,6 +17,7 @@
 package com.android.systemui.car.users;
 
 import android.app.ActivityManager;
+import android.app.IActivityManager;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Process;
@@ -24,9 +25,11 @@ import android.os.UserHandle;
 import android.os.UserManager;
 
 import com.android.systemui.CoreStartable;
+import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dump.DumpManager;
+import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserContentResolverProvider;
 import com.android.systemui.settings.UserContextProvider;
 import com.android.systemui.settings.UserFileManager;
@@ -58,6 +61,7 @@ public abstract class CarMultiUserUtilsModule {
     static UserTracker provideUserTracker(
             Context context,
             UserManager userManager,
+            IActivityManager iActivityManager,
             DumpManager dumpManager,
             @Background Handler handler
     ) {
@@ -69,10 +73,21 @@ public abstract class CarMultiUserUtilsModule {
         int startingUser = isSecondaryUserSystemUI
                 ? processUser.getIdentifier()
                 : ActivityManager.getCurrentUser();
-        CarUserTrackerImpl tracker = new CarUserTrackerImpl(context, userManager, dumpManager,
-                handler, isSecondaryUserSystemUI);
+        CarUserTrackerImpl tracker = new CarUserTrackerImpl(context, userManager, iActivityManager,
+                dumpManager, handler, isSecondaryUserSystemUI);
         tracker.initialize(startingUser);
         return tracker;
+    }
+
+    @SysUISingleton
+    @Provides
+    static DisplayTracker provideDisplayTracker(
+            Context context,
+            UserTracker userTracker,
+            CarServiceProvider carServiceProvider,
+            @Background Handler handler
+    ) {
+        return new CarDisplayTrackerImpl(context, userTracker, carServiceProvider, handler);
     }
 
     @Binds

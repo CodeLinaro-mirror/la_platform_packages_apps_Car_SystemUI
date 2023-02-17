@@ -37,6 +37,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.TextView;
 
 import androidx.annotation.MainThread;
 
@@ -44,7 +45,7 @@ import com.android.systemui.R;
 import com.android.systemui.animation.Interpolators;
 
 /**
- * A simple implementation to show a lock icon on the screen when user touches it,
+ * An implementation to show a lock icon on the screen when user touches it,
  * indicating display input lock is currently enabled.
  */
 public final class DisplayInputLockInfoWindow {
@@ -52,11 +53,12 @@ public final class DisplayInputLockInfoWindow {
     private final WindowManager mWindowManager;
     private final WindowManager.LayoutParams mLp;
     private final ViewGroup mLockInfoViewGroup;
-    private final View mLockIconView;
+    private TextView mLockIconView;
     private final long mDismissAnimDurationMs;
-    private final long mAutoDismissDelayMs;
+    private long mAutoDismissDelayMs;
 
     private boolean mIsShown;  // Only accessed from MainThread.
+    private boolean mIsTransitioningToHide;  // Only accessed from MainThread.
 
     private final Runnable mHideInputLockInfoRunnable = () -> {
         hideInputLockInfoWindow();
@@ -75,7 +77,8 @@ public final class DisplayInputLockInfoWindow {
      * @param display The display to add the input lock info window on.
      */
     @MainThread
-    public DisplayInputLockInfoWindow(@NonNull Context context, @NonNull Display display) {
+    public DisplayInputLockInfoWindow(@NonNull Context context, @NonNull Display display,
+            int textResource, int configDismissDelay) {
         mHandler = context.getMainThreadHandler();
         // Construct an instance of WindowManager to add the input lock info window of
         // TYPE_SYSTEM_OVERLAY to the Display `display`.
@@ -84,14 +87,15 @@ public final class DisplayInputLockInfoWindow {
         mLockInfoViewGroup = (ViewGroup) LayoutInflater.from(context)
                 .inflate(R.layout.display_input_locked, /* root= */ null);
         mLockIconView = mLockInfoViewGroup.findViewById(R.id.display_input_lock_icon);
+        mLockIconView.setText(context.getString(textResource));
         mDismissAnimDurationMs = context.getResources().getInteger(
                 R.integer.config_displayInputLockIconAnimDuration);
         mAutoDismissDelayMs = context.getResources().getInteger(
-                R.integer.config_displayInputLockIconDismissDelay);
+                configDismissDelay);
         mLp = new WindowManager.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, TYPE_SYSTEM_OVERLAY,
                 FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCHABLE, PixelFormat.RGBA_8888);
 
-        mLp.gravity = Gravity.CENTER;
+        mLp.gravity = Gravity.BOTTOM;
         mLp.privateFlags |= SYSTEM_FLAG_SHOW_FOR_ALL_USERS;
         mLp.setTitle("DisplayInputLockInfo#" + display.getDisplayId());
     }
@@ -117,6 +121,25 @@ public final class DisplayInputLockInfoWindow {
         mHandler.post(mHideInputLockInfoRunnable);
     }
 
+    /**
+     * Set the text resource to be displayed in the window
+     *
+     * @param newTextResource The int text resource for the window TextView
+     */
+    public void setText(@NonNull Context context, int newTextResource) {
+        mLockIconView.setText(context.getString(newTextResource));
+    }
+
+    /**
+     * Set the dismiss delay for the window
+     *
+     * @param newDismissDelay The duration until the window disappears
+     */
+    public void setDismissDelay(@NonNull Context context, int newDismissDelay) {
+        mAutoDismissDelayMs = context.getResources().getInteger(
+                newDismissDelay);
+    }
+
     private void hideDelayed(long delayMillis) {
         mHandler.removeCallbacks(mHideInputLockInfoRunnable);
         mHandler.postDelayed(mHideInputLockInfoRunnable, delayMillis);
@@ -134,24 +157,42 @@ public final class DisplayInputLockInfoWindow {
 
     @MainThread
     private void hideInputLockInfoWindow() {
-        if (!mIsShown) {
+        if (!mIsShown || mIsTransitioningToHide) {
             return;
         }
 
-        TransitionSet transition = new TransitionSet();
-        transition.addTransition(new Fade(Fade.OUT));
-        transition.setDuration(mDismissAnimDurationMs);
-        transition.setInterpolator(Interpolators.DECELERATE_QUINT);
-        transition.addListener(new TransitionListenerAdapter() {
-            @Override
-            @MainThread
-            public void onTransitionEnd(Transition transition) {
-                mWindowManager.removeView(mLockInfoViewGroup);
-                mIsShown = false;
-                transition.removeListener(this);
-            }
-        });
-        TransitionManager.beginDelayedTransition(mLockInfoViewGroup, transition);
-        mLockIconView.setVisibility(View.INVISIBLE);
+        if (shouldAnimateLockIconView()) {
+            mIsTransitioningToHide = true;
+            TransitionSet transition = new TransitionSet();
+            transition.addTransition(new Fade(Fade.OUT));
+            transition.setDuration(mDismissAnimDurationMs);
+            transition.setInterpolator(Interpolators.DECELERATE_QUINT);
+            transition.addListener(new TransitionListenerAdapter() {
+                @Override
+                @MainThread
+                public void onTransitionEnd(Transition transition) {
+                    transition.removeListener(this);
+                    hideImmediately();
+                }
+            });
+            TransitionManager.beginDelayedTransition(mLockInfoViewGroup, transition);
+            mLockIconView.setVisibility(View.INVISIBLE);
+        } else {
+            hideImmediately();
+        }
+    }
+
+    @MainThread
+    private void hideImmediately() {
+        mWindowManager.removeView(mLockInfoViewGroup);
+        mIsShown = false;
+        mIsTransitioningToHide = false;
+    }
+
+    @MainThread
+    private boolean shouldAnimateLockIconView() {
+        // The lock icon view is animated only if the container view {@code mLockInfoViewGroup} has
+        // already been laid out. If it hasn't been laid out, it hasn't been drawn to screen yet.
+        return mLockInfoViewGroup.isLaidOut();
     }
 }
