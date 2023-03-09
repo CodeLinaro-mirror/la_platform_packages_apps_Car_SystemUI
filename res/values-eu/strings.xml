@@ -87,4 +87,29 @@
     <string name="qc_footer_network_sound_settings" msgid="5117011034908775097">"Soinuaren ezarpenak"</string>
     <string name="qc_footer_profiles_accounts_settings" msgid="4456419248123950232">"Profilen eta kontuen ezarpenak"</string>
     <string name="lockpattern_does_not_support_rotary" msgid="4605787900312103476">"Ezin da erabili biratze bidezko idazketa; erabili ukipen-keinuak"</string>
+    <string name="display_input_lock_text" msgid="8524876126635885614">"Blokeatu da ukipen-pantaila"</string>
+    <string name="display_input_lock_initial_text" msgid="7497552507312397576">"Blokeatu da pantaila"</string>
+    <string name="user_logout_title" msgid="5534754139319586681">"Ziur saioa amaitu nahi duzula?"</string>
+    <string name="user_logout_message" msgid="7804089876692575056">"Irekitako aplikazio guztiak itxiko dira"</string>
+    <string name="user_logout" msgid="2934184154258330491">"Amaitu saioa"</string>
+    <string name="car_guest" msgid="768913000117469596">"Gonbidatua"</string>
+    <string name="user_switching_message" msgid="634395959804046394">"Erabiltzailea aldatzen"</string>
+    <string name="user_adding_message" msgid="7328589666615053611">"Beste erabiltzaile bat gehitzen"</string>
+    <string name="max_user_limit_reached_title" msgid="8713446223097215112">"Erabiltzaile-mugara iritsi zara"</string>
+    <string name="max_user_limit_reached_message" msgid="644904407853005163">"Hauek gehi ditzakezu gehienez: "</string>
+    <string name="confirm_add_user_title" msgid="1237839494207086048">"Beste erabiltzaile bat gehitu nahi duzu?"</string>
+    <string name="already_logged_in_message" msgid="2440895716293348878">"Beste pantaila batean saioa hasita daukazu jada"</string>
+    <string name="header_bar_text_in_logged_out_state" msgid="6012093149493906956">"Hasteko, hautatu profil bat"</string>
+    <string name="logged_in_text" msgid="932290859654786874">"Saioa hasita"</string>
+    <string name="prefix_logged_in_info_for_other_seat" msgid="1768113737410046246">"Eserleku honetako erabiltzaileak saioa hasita dauka: <xliff:g id="SEAT_LOCATION">%s</xliff:g>"</string>
+    <string name="create_user_failed_message" msgid="7107927788723239958">"Ezin izan da gehitu erabiltzailea. Saiatu tarte bat igaro ondoren."</string>
+    <string name="guest_creation_failed_message" msgid="124079314799870297">"Tarte bat igaro ondoren, probatu saioa gonbidatu gisa hasten"</string>
+    <string name="stopping_user_text" msgid="8582746159702773548">"Gelditzen"</string>
+    <string name="wait_for_until_stopped_message" msgid="96033243744574465">"Itxaron erabiltzailea gelditu arte"</string>
+    <string name="seat_driver" msgid="4502591979520445677">"gidaria"</string>
+    <string name="seat_front" msgid="836133281052793377">"aurrekoa"</string>
+    <string name="seat_rear" msgid="403133444964528577">"atzekoa"</string>
+    <string name="seat_left_side" msgid="7460757956924015769">"ezkerrekoa"</string>
+    <string name="seat_center_side" msgid="6661501442901282386">"erdikoa"</string>
+    <string name="seat_right_side" msgid="6735434879559763096">"eskuinekoa"</string>
 </resources>
