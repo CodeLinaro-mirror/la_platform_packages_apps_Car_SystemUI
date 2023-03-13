@@ -36,7 +36,6 @@ import com.android.car.ui.utils.ViewUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
-import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.hvac.HvacPanelOverlayViewController;
 import com.android.systemui.car.privacy.CameraPrivacyElementsProviderImpl;
 import com.android.systemui.car.privacy.MicPrivacyElementsProviderImpl;
@@ -67,7 +66,6 @@ public class CarSystemBarController {
     private final Context mContext;
     private final UserTracker mUserTracker;
     private final CarSystemBarViewFactory mCarSystemBarViewFactory;
-    private final CarServiceProvider mCarServiceProvider;
     private final BroadcastDispatcher mBroadcastDispatcher;
     private final ConfigurationController mConfigurationController;
     private final ButtonSelectionStateController mButtonSelectionStateController;
@@ -79,10 +77,11 @@ public class CarSystemBarController {
     private final Lazy<MicPrivacyElementsProviderImpl> mMicPrivacyElementsProviderLazy;
     private final Lazy<CameraPrivacyElementsProviderImpl> mCameraPrivacyElementsProviderLazy;
 
-    private final boolean mShowTop;
-    private final boolean mShowBottom;
-    private final boolean mShowLeft;
-    private final boolean mShowRight;
+    private final SystemBarConfigs mSystemBarConfigs;
+    private boolean mShowTop;
+    private boolean mShowBottom;
+    private boolean mShowLeft;
+    private boolean mShowRight;
     private final int mPrivacyChipXOffset;
 
     @IdRes
@@ -121,7 +120,6 @@ public class CarSystemBarController {
     public CarSystemBarController(Context context,
             UserTracker userTracker,
             CarSystemBarViewFactory carSystemBarViewFactory,
-            CarServiceProvider carServiceProvider,
             BroadcastDispatcher broadcastDispatcher,
             ConfigurationController configurationController,
             ButtonSelectionStateController buttonSelectionStateController,
@@ -136,7 +134,6 @@ public class CarSystemBarController {
         mContext = context;
         mUserTracker = userTracker;
         mCarSystemBarViewFactory = carSystemBarViewFactory;
-        mCarServiceProvider = carServiceProvider;
         mBroadcastDispatcher = broadcastDispatcher;
         mConfigurationController = configurationController;
         mButtonSelectionStateController = buttonSelectionStateController;
@@ -147,15 +144,28 @@ public class CarSystemBarController {
         mQCViewControllerProvider = qcViewControllerProvider;
         mMicPrivacyElementsProviderLazy = micPrivacyElementsProvider;
         mCameraPrivacyElementsProviderLazy = cameraPrivacyElementsProvider;
+        mSystemBarConfigs = systemBarConfigs;
 
         // Read configuration.
-        mShowTop = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.TOP);
-        mShowBottom = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.BOTTOM);
-        mShowLeft = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.LEFT);
-        mShowRight = systemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.RIGHT);
-
+        readConfigs();
         mPrivacyChipXOffset = -context.getResources()
                 .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
+    }
+
+    /**
+     * Invalidate SystemBarConfigs and fetch again from Resources.
+     * TODO(): b/260206944, Can remove this after we have a fix for overlaid resources not applied.
+     */
+    void resetSystemBarConfigs() {
+        mSystemBarConfigs.resetSystemBarConfigs();
+        readConfigs();
+    }
+
+    private void readConfigs() {
+        mShowTop = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.TOP);
+        mShowBottom = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.BOTTOM);
+        mShowLeft = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.LEFT);
+        mShowRight = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.RIGHT);
     }
 
     /**
@@ -436,7 +446,7 @@ public class CarSystemBarController {
             NotificationsShadeController notifShadeController,
             HvacPanelController hvacPanelController,
             HvacPanelOverlayViewController hvacPanelOverlayViewController) {
-        view.updateHomeButtonVisibility(CarSystemUIUserUtil.isSecondaryMUMDSystemUI(mContext));
+        view.updateHomeButtonVisibility(CarSystemUIUserUtil.isSecondaryMUMDSystemUI());
         view.setStatusBarWindowTouchListeners(statusBarTouchListeners);
         view.setNotificationsPanelController(notifShadeController);
         view.setHvacPanelController(hvacPanelController);
@@ -453,8 +463,7 @@ public class CarSystemBarController {
             @LayoutRes int panelLayoutRes) {
         if (panelController == null) {
             panelController = new StatusIconPanelController(mContext, mUserTracker,
-                    mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
-                    mQCViewControllerProvider);
+                    mBroadcastDispatcher, mConfigurationController, mQCViewControllerProvider);
         }
         panelController.attachPanel(mTopView.requireViewById(chipId), panelLayoutRes,
                 R.dimen.car_sensor_qc_panel_width, mPrivacyChipXOffset,
@@ -469,8 +478,8 @@ public class CarSystemBarController {
             boolean profilePanelDisabledWhileDriving = mContext.getResources().getBoolean(
                     R.bool.config_profile_panel_disabled_while_driving);
             mProfilePanelController = new StatusIconPanelController(mContext, mUserTracker,
-                    mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
-                    mQCViewControllerProvider, profilePanelDisabledWhileDriving);
+                    mBroadcastDispatcher, mConfigurationController, mQCViewControllerProvider,
+                    profilePanelDisabledWhileDriving);
             mProfilePanelController.attachPanel(profilePickerView, R.layout.qc_profile_switcher,
                     R.dimen.car_profile_quick_controls_panel_width, Gravity.TOP | Gravity.END);
         }

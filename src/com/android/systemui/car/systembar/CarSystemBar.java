@@ -16,9 +16,6 @@
 
 package com.android.systemui.car.systembar;
 
-import static android.view.InsetsState.ITYPE_NAVIGATION_BAR;
-import static android.view.InsetsState.ITYPE_STATUS_BAR;
-import static android.view.InsetsState.containsType;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
 
 import static com.android.systemui.statusbar.phone.BarTransitions.MODE_SEMI_TRANSPARENT;
@@ -33,9 +30,9 @@ import android.graphics.Rect;
 import android.inputmethodservice.InputMethodService;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
@@ -54,6 +51,7 @@ import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.plugins.DarkIconDispatcher;
+import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.shared.system.TaskStackChangeListener;
 import com.android.systemui.shared.system.TaskStackChangeListeners;
 import com.android.systemui.statusbar.AutoHideUiElement;
@@ -90,6 +88,7 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
     private final DelayableExecutor mExecutor;
     private final Executor mUiBgExecutor;
     private final IStatusBarService mBarService;
+    private final DisplayTracker mDisplayTracker;
     private final Lazy<KeyguardStateController> mKeyguardStateControllerLazy;
     private final Lazy<PhoneStatusBarPolicy> mIconPolicyLazy;
     private final HvacController mHvacController;
@@ -153,7 +152,8 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
             HvacController hvacController,
             StatusBarSignalPolicy signalPolicy,
             SystemBarConfigs systemBarConfigs,
-            ConfigurationController configurationController
+            ConfigurationController configurationController,
+            DisplayTracker displayTracker
     ) {
         mContext = context;
         mCarSystemBarController = carSystemBarController;
@@ -173,6 +173,7 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
         mSignalPolicy = signalPolicy;
         mDisplayId = context.getDisplayId();
         mUiModeManager = mContext.getSystemService(UiModeManager.class);
+        mDisplayTracker = displayTracker;
         configurationController.addCallback(this);
     }
 
@@ -356,7 +357,7 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
 
         // Try setting up the initial state of the nav bar if applicable.
         if (result != null) {
-            setImeWindowStatus(Display.DEFAULT_DISPLAY, result.mImeToken,
+            setImeWindowStatus(mDisplayTracker.getDefaultDisplayId(), result.mImeToken,
                     result.mImeWindowVis, result.mImeBackDisposition,
                     result.mShowImeSwitcher);
         }
@@ -539,17 +540,17 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
     }
 
     @Override
-    public void showTransient(int displayId, int[] types) {
+    public void showTransient(int displayId, int types) {
         if (displayId != mDisplayId) {
             return;
         }
-        if (containsType(types, ITYPE_STATUS_BAR)) {
+        if ((types & WindowInsets.Type.statusBars()) != 0) {
             if (!mStatusBarTransientShown) {
                 mStatusBarTransientShown = true;
                 handleTransientChanged();
             }
         }
-        if (containsType(types, ITYPE_NAVIGATION_BAR)) {
+        if ((types & WindowInsets.Type.navigationBars()) != 0) {
             if (!mNavBarTransientShown) {
                 mNavBarTransientShown = true;
                 handleTransientChanged();
@@ -558,11 +559,11 @@ public class CarSystemBar implements CoreStartable, CommandQueue.Callbacks,
     }
 
     @Override
-    public void abortTransient(int displayId, int[] types) {
+    public void abortTransient(int displayId, int types) {
         if (displayId != mDisplayId) {
             return;
         }
-        if (!containsType(types, ITYPE_STATUS_BAR) && !containsType(types, ITYPE_NAVIGATION_BAR)) {
+        if ((types & (WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars())) == 0) {
             return;
         }
         clearTransient();
