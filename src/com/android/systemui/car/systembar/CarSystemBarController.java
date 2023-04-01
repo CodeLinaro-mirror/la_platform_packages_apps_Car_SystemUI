@@ -451,6 +451,7 @@ public class CarSystemBarController {
         view.setNotificationsPanelController(notifShadeController);
         view.setHvacPanelController(hvacPanelController);
         view.registerHvacPanelOverlayViewController(hvacPanelOverlayViewController);
+        view.updateControlCenterButtonVisibility(CarSystemUIUserUtil.isMUMDSystemUI());
         mButtonSelectionStateController.addAllButtonsWithSelectionState(view);
         mButtonRoleHolderController.addAllButtonsWithRoleName(view);
         mUserNameViewControllerLazy.get().addUserNameView(view);
@@ -464,10 +465,10 @@ public class CarSystemBarController {
         if (panelController == null) {
             panelController = new StatusIconPanelController(mContext, mUserTracker,
                     mBroadcastDispatcher, mConfigurationController, mQCViewControllerProvider);
-        }
-        panelController.attachPanel(mTopView.requireViewById(chipId), panelLayoutRes,
+            panelController.attachPanel(mTopView.requireViewById(chipId), panelLayoutRes,
                 R.dimen.car_sensor_qc_panel_width, mPrivacyChipXOffset,
                 panelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+        }
 
         return panelController;
     }
