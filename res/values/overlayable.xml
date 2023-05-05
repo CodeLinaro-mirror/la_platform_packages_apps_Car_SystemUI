@@ -176,22 +176,6 @@ REGENERATE USING packages/apps/Car/libs/tools/rro/generate-overlayable.py
       <item type="color" name="system_bar_text_color_with_selection"/>
       <item type="color" name="system_bar_text_selected_color"/>
       <item type="color" name="system_bar_text_unavailable_color"/>
-      <item type="color" name="user_background_icon_1"/>
-      <item type="color" name="user_background_icon_2"/>
-      <item type="color" name="user_background_icon_3"/>
-      <item type="color" name="user_background_icon_4"/>
-      <item type="color" name="user_background_icon_5"/>
-      <item type="color" name="user_background_icon_6"/>
-      <item type="color" name="user_background_icon_7"/>
-      <item type="color" name="user_background_icon_8"/>
-      <item type="color" name="user_name_icon_1"/>
-      <item type="color" name="user_name_icon_2"/>
-      <item type="color" name="user_name_icon_3"/>
-      <item type="color" name="user_name_icon_4"/>
-      <item type="color" name="user_name_icon_5"/>
-      <item type="color" name="user_name_icon_6"/>
-      <item type="color" name="user_name_icon_7"/>
-      <item type="color" name="user_name_icon_8"/>
       <item type="color" name="user_picker_background_color"/>
       <item type="color" name="user_picker_background_pill_color"/>
       <item type="color" name="user_picker_bottom_bar_color"/>
@@ -199,14 +183,6 @@ REGENERATE USING packages/apps/Car/libs/tools/rro/generate-overlayable.py
       <item type="color" name="user_picker_snack_bar_background_color"/>
       <item type="color" name="user_picker_snack_bar_transparent_color"/>
       <item type="color" name="user_picker_user_name_color"/>
-      <item type="color" name="userpicker_color_1"/>
-      <item type="color" name="userpicker_color_2"/>
-      <item type="color" name="userpicker_color_3"/>
-      <item type="color" name="userpicker_color_4"/>
-      <item type="color" name="userpicker_color_5"/>
-      <item type="color" name="userpicker_color_6"/>
-      <item type="color" name="userpicker_color_7"/>
-      <item type="color" name="userpicker_color_8"/>
       <item type="color" name="userpicker_guest_color"/>
       <item type="dimen" name="activity_blocking_action_button_corner_radius"/>
       <item type="dimen" name="activity_blocking_action_button_height"/>
@@ -252,6 +228,7 @@ REGENERATE USING packages/apps/Car/libs/tools/rro/generate-overlayable.py
       <item type="dimen" name="car_quick_controls_entry_points_button_margin_top"/>
       <item type="dimen" name="car_quick_controls_entry_points_button_width"/>
       <item type="dimen" name="car_quick_controls_entry_points_icon_width"/>
+      <item type="dimen" name="car_quick_controls_entry_points_icon_space"/>
       <item type="dimen" name="car_quick_controls_footer_button_horizontal_padding"/>
       <item type="dimen" name="car_quick_controls_footer_button_min_height"/>
       <item type="dimen" name="car_quick_controls_footer_button_start_margin"/>
@@ -482,6 +459,7 @@ REGENERATE USING packages/apps/Car/libs/tools/rro/generate-overlayable.py
       <item type="drawable" name="car_ic_brightness"/>
       <item type="drawable" name="car_ic_chevron_right"/>
       <item type="drawable" name="car_ic_control_center"/>
+      <item type="drawable" name="car_ic_control_center_selected"/>
       <item type="drawable" name="car_ic_drive_mode"/>
       <item type="drawable" name="car_ic_home"/>
       <item type="drawable" name="car_ic_home_selected"/>
