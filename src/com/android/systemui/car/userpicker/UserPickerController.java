@@ -17,12 +17,14 @@
 package com.android.systemui.car.userpicker;
 
 import static android.car.CarOccupantZoneManager.INVALID_USER_ID;
+import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_STOPPED;
 import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_UNLOCKED;
 import static android.car.user.CarUserManager.lifecycleEventTypeToString;
 import static android.view.Display.INVALID_DISPLAY;
 
 import static com.android.systemui.car.userpicker.DialogManager.DIALOG_TYPE_ADDING_USER;
 import static com.android.systemui.car.userpicker.DialogManager.DIALOG_TYPE_CONFIRM_ADD_USER;
+import static com.android.systemui.car.userpicker.DialogManager.DIALOG_TYPE_CONFIRM_LOGOUT;
 import static com.android.systemui.car.userpicker.DialogManager.DIALOG_TYPE_MAX_USER_COUNT_REACHED;
 import static com.android.systemui.car.userpicker.DialogManager.DIALOG_TYPE_SWITCHING;
 import static com.android.systemui.car.userpicker.HeaderState.HEADER_STATE_CHANGE_USER;
@@ -150,6 +152,7 @@ final class UserPickerController {
             mIsUserPickerClickable = false;
             handleUserSelected(userRecord);
         } else {
+            Slog.w(TAG, "Unsuccessful UserCreationResult:" + result.toString());
             // Show snack bar message for the failure of user creation.
             runOnMainHandler(REQ_SHOW_SNACKBAR,
                     mContext.getString(R.string.create_user_failed_message));
@@ -192,6 +195,15 @@ final class UserPickerController {
                 }
                 mCallbacks.onFinishRequested();
                 mUserPickerSharedState.resetUserLoginStarted(mDisplayId);
+            }
+        } else if (userState == USER_LIFECYCLE_EVENT_TYPE_STOPPED) {
+            if (mCarServiceMediator.getUserForDisplay(mDisplayId) == INVALID_USER_ID
+                    && mHeaderState.getState() == HEADER_STATE_CHANGE_USER) {
+                if (DEBUG) {
+                    Slog.d(TAG, "user " + userId + " stopped. change header state."
+                            + " displayId=" + mDisplayId);
+                }
+                mHeaderState.setState(HEADER_STATE_LOGOUT);
             }
         }
         mCallbacks.onUpdateUsers(createUserRecords());
@@ -265,14 +277,20 @@ final class UserPickerController {
         mIsUserPickerClickable = false;
         int userId = mCarServiceMediator.getUserForDisplay(mDisplayId);
         if (userId != INVALID_USER_ID) {
-            mUserPickerSharedState.resetUserLoginStarted(mDisplayId);
-            mUserEventManager.stopUserUnchecked(userId, mDisplayId);
-            mUserEventManager.runUpdateUsersOnMainThread(userId, 0);
-            mIsUserPickerClickable = true;
-            mHeaderState.setState(HEADER_STATE_LOGOUT);
+            mDialogManager.showDialog(
+                    DIALOG_TYPE_CONFIRM_LOGOUT,
+                    () -> logoutUserInternal(userId),
+                    () -> mIsUserPickerClickable = true);
         } else {
             mIsUserPickerClickable = true;
         }
+    }
+
+    private void logoutUserInternal(int userId) {
+        mUserPickerSharedState.resetUserLoginStarted(mDisplayId);
+        mUserEventManager.stopUserUnchecked(userId, mDisplayId);
+        mUserEventManager.runUpdateUsersOnMainThread(userId, 0);
+        mIsUserPickerClickable = true;
     }
 
     @VisibleForTesting
@@ -400,6 +418,13 @@ final class UserPickerController {
                     runOnMainHandler(REQ_SHOW_SWITCHING_DIALOG);
                     UserCreationResult creationResult = mUserEventManager.createGuest();
                     if (creationResult == null || !creationResult.isSuccess()) {
+                        if (creationResult == null) {
+                            Slog.w(TAG, "Guest UserCreationResult is null");
+                        } else if (!creationResult.isSuccess()) {
+                            Slog.w(TAG, "Unsuccessful guest UserCreationResult: "
+                                    + creationResult.toString());
+                        }
+
                         runOnMainHandler(REQ_DISMISS_SWITCHING_DIALOG);
                         // Show snack bar message for the failure of guest creation.
                         runOnMainHandler(REQ_SHOW_SNACKBAR,
