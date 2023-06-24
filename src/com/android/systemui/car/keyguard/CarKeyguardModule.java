@@ -16,6 +16,7 @@
 
 package com.android.systemui.car.keyguard;
 
+import android.app.IActivityTaskManager;
 import android.app.trust.TrustManager;
 import android.content.Context;
 import android.os.PowerManager;
@@ -63,6 +64,9 @@ import com.android.systemui.statusbar.phone.ScrimController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserSwitcherController;
 import com.android.systemui.util.DeviceConfigProxy;
+import com.android.systemui.util.settings.SecureSettings;
+import com.android.systemui.util.settings.SystemSettings;
+import com.android.systemui.util.time.SystemClock;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
 import dagger.Lazy;
@@ -127,7 +131,11 @@ public class CarKeyguardModule {
             Lazy<NotificationShadeWindowController> notificationShadeWindowController,
             Lazy<ActivityLaunchAnimator> activityLaunchAnimator,
             Lazy<ScrimController> scrimControllerLazy,
+            IActivityTaskManager activityTaskManagerService,
             FeatureFlags featureFlags,
+            SecureSettings secureSettings,
+            SystemSettings systemSettings,
+            SystemClock systemClock,
             @Main CoroutineDispatcher mainDispatcher,
             Lazy<DreamingToLockscreenTransitionViewModel> dreamingToLockscreenTransitionViewModel,
             SystemPropertiesHelper systemPropertiesHelper) {
@@ -164,7 +172,11 @@ public class CarKeyguardModule {
                 notificationShadeWindowController,
                 activityLaunchAnimator,
                 scrimControllerLazy,
+                activityTaskManagerService,
                 featureFlags,
+                secureSettings,
+                systemSettings,
+                systemClock,
                 mainDispatcher,
                 dreamingToLockscreenTransitionViewModel,
                 systemPropertiesHelper);
