@@ -18,6 +18,7 @@ package com.android.systemui;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 
 import com.android.systemui.dagger.GlobalRootComponent;
@@ -33,6 +34,9 @@ import java.util.Set;
  * Class factory to provide car specific SystemUI components.
  */
 public class CarSystemUIFactory extends SystemUIFactory {
+
+    private static boolean mIsBike = SystemProperties.getBoolean("ro.hw.vehicle.isbike", false);
+
     @Override
     protected GlobalRootComponent buildGlobalRootComponent(Context context) {
         return DaggerCarGlobalRootComponent.builder()
@@ -66,7 +70,7 @@ public class CarSystemUIFactory extends SystemUIFactory {
     protected SysUIComponent.Builder prepareSysUIComponentBuilder(
             SysUIComponent.Builder sysUIBuilder, WMComponent wm) {
         CarWMComponent carWm = (CarWMComponent) wm;
-        boolean isSystemUser = UserHandle.myUserId() == UserHandle.USER_SYSTEM;
+        boolean isSystemUser = !mIsBike ? (UserHandle.myUserId() == UserHandle.USER_SYSTEM) : false;
         return ((CarSysUIComponent.Builder) sysUIBuilder).setRootTaskDisplayAreaOrganizer(
                 isSystemUser ? Optional.of(carWm.getRootTaskDisplayAreaOrganizer())
                         : Optional.empty());
