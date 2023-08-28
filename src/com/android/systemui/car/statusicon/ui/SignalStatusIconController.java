@@ -28,8 +28,12 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.database.ContentObserver;
+import android.net.Uri;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.provider.Settings.Global;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -38,6 +42,7 @@ import com.android.settingslib.graph.SignalDrawable;
 import com.android.systemui.R;
 import com.android.systemui.car.statusicon.StatusIconController;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.qs.SettingObserver;
 import com.android.systemui.statusbar.connectivity.MobileDataIndicators;
 import com.android.systemui.statusbar.connectivity.NetworkController;
 import com.android.systemui.statusbar.connectivity.SignalCallback;
@@ -56,16 +61,20 @@ public class SignalStatusIconController extends StatusIconController implements
     private final Resources mResources;
     private final HotspotController mHotspotController;
     private final NetworkController mNetworkController;
+    private SettingObserver mAirplaneModeObserver = null;
 
     private SignalDrawable mMobileSignalIconDrawable;
     private Drawable mWifiSignalIconDrawable;
     private Drawable mHotSpotIconDrawable;
     private Drawable mLTEDrawable;
+    private Drawable mAirplaneDrawable;
     private boolean mIsWifiEnabledAndConnected;
     private boolean mIsHotspotEnabled;
     private String mMobileSignalContentDescription;
     private String mWifiConnectedContentDescription;
     private String mHotspotOnContentDescription;
+    private boolean mIsAirplaneEnabled;
+    private Handler mHandler;
 
     //GARUDA: Boolean to check if network type LTE
     private boolean mIsLTE = false;
@@ -77,12 +86,14 @@ public class SignalStatusIconController extends StatusIconController implements
             NetworkController networkController,
             HotspotController hotspotController) {
         mContext = context;
+        mHandler =  new Handler();
         mResources = resources;
         mHotspotController = hotspotController;
         mNetworkController = networkController;
 
         mMobileSignalIconDrawable = new SignalDrawable(mContext);
         mHotSpotIconDrawable = mResources.getDrawable(R.drawable.ic_hotspot, mContext.getTheme());
+        mAirplaneDrawable = mResources.getDrawable(R.drawable.ic_airplane, mContext.getTheme());
 
         mMobileSignalContentDescription = resources.getString(R.string.status_icon_signal_mobile);
         mWifiConnectedContentDescription = resources.getString(R.string.status_icon_signal_wifi);
@@ -90,6 +101,11 @@ public class SignalStatusIconController extends StatusIconController implements
 
         mNetworkController.addCallback(this);
         mHotspotController.addCallback(this);
+        if (mAirplaneModeObserver == null) {
+            mAirplaneModeObserver = new SettingObserver();
+        }
+        mContext.getContentResolver()
+                .registerContentObserver(SettingObserver.URI, false, mAirplaneModeObserver);
 
         // TwoWheeler: START: Add LTE icon
         mLTEDrawable = mContext.getDrawable(R.drawable.ic_two_wheeler_4g);
@@ -104,6 +120,8 @@ public class SignalStatusIconController extends StatusIconController implements
         } else if (mIsWifiEnabledAndConnected) {
             setIconDrawableToDisplay(mWifiSignalIconDrawable);
             setIconContentDescription(mWifiConnectedContentDescription);
+        } else if (mIsAirplaneEnabled) {
+            setIconDrawableToDisplay(mAirplaneDrawable);
         } else {
             // TwoWheeler: END: Add LTE icon
             if (mIsLTE && mLTEDrawable != null) {
@@ -111,7 +129,7 @@ public class SignalStatusIconController extends StatusIconController implements
                 Drawable lteVersionDrawable = new BitmapDrawable(mContext.getResources(), lteVersionBitmap);
                 setIconDrawableToDisplay(lteVersionDrawable);
             } else {
-                setIconDrawableToDisplay(mMobileSignalIconDrawable)
+                setIconDrawableToDisplay(mMobileSignalIconDrawable);
                 setIconContentDescription(mMobileSignalContentDescription);
             }
             // TwoWheeler: END: Add LTE icon
@@ -187,5 +205,32 @@ public class SignalStatusIconController extends StatusIconController implements
     @Override
     protected int getId() {
         return R.id.qc_signal_status_icon;
+    }
+
+    @Override
+    protected void finalize() {
+        if (mAirplaneModeObserver != null) {
+            mContext.getContentResolver().unregisterContentObserver(mAirplaneModeObserver);
+        }
+    }
+
+    class SettingObserver extends ContentObserver {
+
+       public static final Uri URI = Global.getUriFor(Global.AIRPLANE_MODE_ON);
+
+       public SettingObserver() {
+           super(new Handler());
+       }
+
+       @Override
+       public void onChange(boolean selfChange, Uri uri) {
+           super.onChange(selfChange, uri);
+           if (this.URI.equals(uri)) {
+               boolean isAirplaneMode = Global.getInt(mContext.getContentResolver(),
+                       Global.AIRPLANE_MODE_ON, 0) != 0;
+               mIsAirplaneEnabled = (isAirplaneMode) ? true : false;
+               updateStatus();
+          }
+        }
     }
 }
