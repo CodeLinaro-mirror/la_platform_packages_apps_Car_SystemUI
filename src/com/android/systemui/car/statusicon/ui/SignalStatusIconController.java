@@ -30,6 +30,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.provider.Settings.Global;
 import android.util.Log;
 
 import androidx.annotation.VisibleForTesting;
@@ -38,6 +40,7 @@ import com.android.settingslib.graph.SignalDrawable;
 import com.android.systemui.R;
 import com.android.systemui.car.statusicon.StatusIconController;
 import com.android.systemui.dagger.qualifiers.Main;
+import com.android.systemui.qs.GlobalSetting;
 import com.android.systemui.statusbar.connectivity.NetworkController;
 import com.android.systemui.statusbar.connectivity.MobileDataIndicators;
 import com.android.systemui.statusbar.connectivity.SignalCallback;
@@ -56,13 +59,17 @@ public class SignalStatusIconController extends StatusIconController implements
     private final Resources mResources;
     private final HotspotController mHotspotController;
     private final NetworkController mNetworkController;
+    private final GlobalSetting mSetting;
 
     private SignalDrawable mMobileSignalIconDrawable;
     private Drawable mWifiSignalIconDrawable;
     private Drawable mHotSpotIconDrawable;
     private Drawable mLTEDrawable;
+    private Drawable mAirplaneDrawable;
     private boolean mIsWifiEnabledAndConnected;
     private boolean mIsHotspotEnabled;
+    private boolean mIsAirplaneEnabled;
+    private Handler mHandler;
 
     //GARUDA: Boolean to check if network type LTE
     private boolean isLTE = false;
@@ -74,15 +81,27 @@ public class SignalStatusIconController extends StatusIconController implements
             NetworkController networkController,
             HotspotController hotspotController) {
         mContext = context;
+        mHandler =  new Handler();
         mResources = resources;
         mHotspotController = hotspotController;
         mNetworkController = networkController;
 
         mMobileSignalIconDrawable = new SignalDrawable(mContext);
         mHotSpotIconDrawable = mResources.getDrawable(R.drawable.ic_hotspot, mContext.getTheme());
+        mAirplaneDrawable = mResources.getDrawable(R.drawable.ic_airplane, mContext.getTheme());
 
         mNetworkController.addCallback(this);
         mHotspotController.addCallback(this);
+
+        mSetting = new GlobalSetting(mContext, mHandler, Global.AIRPLANE_MODE_ON) {
+            @Override
+            protected void handleValueChanged(int value) {
+                // mHandler is the background handler so calling this is OK
+                handleAirplaneModeState(value);
+            }
+        };
+
+        mSetting.setListening(true);
 
         // TwoWheeler: START: Add LTE icon
         mLTEDrawable = mContext.getDrawable(R.drawable.ic_two_wheeler_4g);
@@ -95,11 +114,15 @@ public class SignalStatusIconController extends StatusIconController implements
             setIconDrawableToDisplay(mHotSpotIconDrawable);
         } else if (mIsWifiEnabledAndConnected) {
             setIconDrawableToDisplay(mWifiSignalIconDrawable);
+        } else if (mIsAirplaneEnabled) {
+            setIconDrawableToDisplay(mAirplaneDrawable);
         } else {
             // TwoWheeler: END: Add LTE icon
             if(isLTE && mLTEDrawable != null) {
-                Bitmap lteVersionBitmap = combineBitmaps(drawableToBitmap(mLTEDrawable), drawableToBitmap(mMobileSignalIconDrawable));
-                Drawable lteVersionDrawable = new BitmapDrawable(mContext.getResources(), lteVersionBitmap);
+                Bitmap lteVersionBitmap = combineBitmaps(drawableToBitmap(mLTEDrawable),
+                        drawableToBitmap(mMobileSignalIconDrawable));
+                Drawable lteVersionDrawable = new BitmapDrawable(mContext.getResources(),
+                        lteVersionBitmap);
                 setIconDrawableToDisplay(lteVersionDrawable);
             } else {
                 setIconDrawableToDisplay(mMobileSignalIconDrawable);
@@ -151,6 +174,11 @@ public class SignalStatusIconController extends StatusIconController implements
     @Override
     public void onHotspotChanged(boolean enabled, int numDevices) {
         mIsHotspotEnabled = enabled;
+        updateStatus();
+    }
+
+    private void handleAirplaneModeState(int value) {
+        mIsAirplaneEnabled = (value == 1) ? true : false;
         updateStatus();
     }
 
