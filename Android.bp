@@ -137,6 +137,10 @@ android_library {
 
     plugins: ["dagger2-compiler"],
 
+    lint: {
+        test: true,
+    },
+
     // TODO(b/218518451) re-enable errorprone.
     errorprone: {enabled: false},
 }
@@ -170,6 +174,10 @@ android_app {
             "proguard.flags",
         ],
     },
+    // TODO(b/301283770): Compiling CarSystemUI should not require -J-Xmx8192M
+    javacflags: [
+        "-J-Xmx8192M",
+    ],
     dxflags: ["--multi-dex"],
 
     aaptflags: [
