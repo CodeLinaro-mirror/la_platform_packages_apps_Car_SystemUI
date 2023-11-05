@@ -28,7 +28,9 @@ import android.widget.LinearLayout;
 
 import com.android.systemui.R;
 import com.android.systemui.car.hvac.HvacPanelOverlayViewController;
+import com.android.systemui.car.hvac.HvacView;
 import com.android.systemui.car.hvac.TemperatureControlView;
+import com.android.systemui.car.notification.NotificationPanelViewController;
 import com.android.systemui.car.statusicon.ui.QuickControlsEntryPointsController;
 import com.android.systemui.car.statusicon.ui.ReadOnlyIconsController;
 import com.android.systemui.car.systembar.CarSystemBarController.HvacPanelController;
@@ -67,9 +69,9 @@ public class CarSystemBarView extends LinearLayout {
     private CarSystemBarButton mPassengerHomeButton;
     private View mNavButtons;
     private CarSystemBarButton mNotificationsButton;
-    private HvacButton mHvacButton;
-    private TemperatureControlView mDriverHvacView;
-    private TemperatureControlView mPassengerHvacView;
+    private CarSystemBarButton mHvacButton;
+    private HvacView mDriverHvacView;
+    private HvacView mPassengerHvacView;
     private NotificationsShadeController mNotificationsShadeController;
     private HvacPanelController mHvacPanelController;
     private View mLockScreenButtons;
@@ -79,6 +81,7 @@ public class CarSystemBarView extends LinearLayout {
     // used to wire in open/close gestures for overlay panels
     private Set<OnTouchListener> mStatusBarWindowTouchListeners;
     private HvacPanelOverlayViewController mHvacPanelOverlayViewController;
+    private NotificationPanelViewController mNotificationPanelViewController;
     private CarSystemBarButton mControlCenterButton;
 
     public CarSystemBarView(Context context, AttributeSet attrs) {
@@ -131,11 +134,13 @@ public class CarSystemBarView extends LinearLayout {
         }
 
         if (mIsDockEnabled) {
-            if (mDriverHvacView != null) {
-                mDriverHvacView.setTemperatureTextClickListener(this::onHvacClick);
+            if (mDriverHvacView instanceof TemperatureControlView) {
+                ((TemperatureControlView) mDriverHvacView).setTemperatureTextClickListener(
+                        this::onHvacClick);
             }
-            if (mPassengerHvacView != null) {
-                mPassengerHvacView.setTemperatureTextClickListener(this::onHvacClick);
+            if (mPassengerHvacView instanceof TemperatureControlView) {
+                ((TemperatureControlView) mPassengerHvacView).setTemperatureTextClickListener(
+                        this::onHvacClick);
             }
         }
     }
@@ -329,6 +334,17 @@ public class CarSystemBarView extends LinearLayout {
         mHvacPanelOverlayViewController = controller;
         if (mHvacPanelOverlayViewController != null && mHvacButton != null) {
             mHvacPanelOverlayViewController.registerViewStateListener(mHvacButton);
+        }
+    }
+
+    /**
+     * Sets the NotificationPanelViewController and adds button listeners
+     */
+    public void registerNotificationPanelViewController(
+            NotificationPanelViewController controller) {
+        mNotificationPanelViewController = controller;
+        if (mNotificationPanelViewController != null && mNotificationsButton != null) {
+            mNotificationPanelViewController.registerViewStateListener(mNotificationsButton);
         }
     }
 
