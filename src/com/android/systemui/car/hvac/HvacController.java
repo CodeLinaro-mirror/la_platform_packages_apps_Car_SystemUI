@@ -220,7 +220,9 @@ public class HvacController implements HvacPropertySetter,
                                     areaId)) == VehicleUnit.FAHRENHEIT;
 
                     // Initialize the view with the initial value.
-                    hvacView.onPropertyChanged(initValue);
+                    if (initValue != null) {
+                        hvacView.onPropertyChanged(initValue);
+                    }
                     hvacView.onHvacTemperatureUnitChanged(usesFahrenheit);
                     for (int propToGetOnInitId : HVAC_PROPERTIES_TO_GET_ON_INIT) {
                         CarPropertyValue propToGetOnInitValue = mCarPropertyManager.getProperty(
