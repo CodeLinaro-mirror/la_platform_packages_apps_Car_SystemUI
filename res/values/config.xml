@@ -242,11 +242,25 @@
     <!-- Determines whether Recents entry point should be shown / should trigger to open Recents -->
     <bool name="config_enableRecentsEntryPoint">true</bool>
 
-    <!-- Flag to enable/disable dock -->
-    <!-- todo(b/304320644): remove flag -->
-    <bool name="config_enableDock">false</bool>
-
     <!-- set to false to use the default TaskDisplayArea -->
     <!-- TODO(b/300930725): launcher doesn't show until it's restarted -->
     <bool name="config_useRemoteLaunchTaskView">false</bool>
+
+    <!-- Determines which system bar to use for display compat toolbar. -->
+    <!-- 0 disabled -->
+    <!-- 1 left -->
+    <!-- 2 right -->
+    <integer name="config_showDisplayCompatToolbarOnSystemBar">1</integer>
+
+    <!-- Determines how to show navigation bar and status bar on app's immersive request, only
+        works if config_remoteInsetsControllerControlsSystemBars is set to true-->
+    <!-- 0 non_immersive show all system bars on immersive request. -->
+    <!-- 1 immersive, hide both bars -->
+    <!-- 2 immersive_with_nav, show nav bar and hide status bar -->
+    <integer name="config_systemBarPersistency">0</integer>
+
+    <!-- Determines the orientation of the status icon. -->
+    <!-- 0 horizontal. -->
+    <!-- 1 vertical -->
+    <integer name="config_statusIconLayoutOrientation">0</integer>
 </resources>

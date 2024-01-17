@@ -16,6 +16,11 @@
 
 package com.android.systemui.car.systembar;
 
+import static com.android.systemui.car.systembar.SystemBarConfigs.BOTTOM;
+import static com.android.systemui.car.systembar.SystemBarConfigs.LEFT;
+import static com.android.systemui.car.systembar.SystemBarConfigs.RIGHT;
+import static com.android.systemui.car.systembar.SystemBarConfigs.TOP;
+
 import android.annotation.LayoutRes;
 import android.app.ActivityManager;
 import android.app.StatusBarManager;
@@ -55,7 +60,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import javax.inject.Inject;
 import javax.inject.Provider;
 
 /** A single class which controls the navigation bar views. */
@@ -120,7 +124,6 @@ public class CarSystemBarController {
     private int mStatusBarState2;
     private int mLockTaskMode;
 
-    @Inject
     public CarSystemBarController(Context context,
             UserTracker userTracker,
             CarSystemBarViewFactory carSystemBarViewFactory,
@@ -158,21 +161,11 @@ public class CarSystemBarController {
                 .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
     }
 
-    /**
-     * Invalidate SystemBarConfigs and fetch again from Resources.
-     * TODO(): b/260206944, Can remove this after we have a fix for overlaid resources not applied.
-     */
-    void resetSystemBarConfigs() {
-        mSystemBarConfigs.resetSystemBarConfigs();
-        mCarSystemBarViewFactory.resetCache();
-        readConfigs();
-    }
-
     private void readConfigs() {
-        mShowTop = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.TOP);
-        mShowBottom = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.BOTTOM);
-        mShowLeft = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.LEFT);
-        mShowRight = mSystemBarConfigs.getEnabledStatusBySide(SystemBarConfigs.RIGHT);
+        mShowTop = mSystemBarConfigs.getEnabledStatusBySide(TOP);
+        mShowBottom = mSystemBarConfigs.getEnabledStatusBySide(BOTTOM);
+        mShowLeft = mSystemBarConfigs.getEnabledStatusBySide(LEFT);
+        mShowRight = mSystemBarConfigs.getEnabledStatusBySide(RIGHT);
     }
 
     /**
@@ -479,9 +472,12 @@ public class CarSystemBarController {
             panelController = new StatusIconPanelController(mContext, mUserTracker,
                     mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
                     mQCViewControllerProvider);
-            panelController.attachPanel(mTopView.requireViewById(chipId), panelLayoutRes,
-                R.dimen.car_sensor_qc_panel_width, mPrivacyChipXOffset,
-                panelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+            View privacyChip = mTopView.findViewById(chipId);
+            if (privacyChip != null) {
+                panelController.attachPanel(privacyChip, panelLayoutRes,
+                        R.dimen.car_sensor_qc_panel_width, mPrivacyChipXOffset,
+                        panelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+            }
         }
 
         return panelController;
@@ -732,8 +728,18 @@ public class CarSystemBarController {
     }
 
     /** Resets the cached Views. */
-    protected void resetCache() {
-        mCarSystemBarViewFactory.resetCache();
+    protected void resetViewCache() {
+        mCarSystemBarViewFactory.resetSystemBarViewCache();
+    }
+
+    /**
+     * Invalidate SystemBarConfigs and fetch again from Resources.
+     * TODO(): b/260206944, Can remove this after we have a fix for overlaid resources not applied.
+     */
+    protected void resetSystemBarConfigs() {
+        mSystemBarConfigs.resetSystemBarConfigs();
+        mCarSystemBarViewFactory.resetSystemBarWindowCache();
+        readConfigs();
     }
 
     /** Stores the ID of the View that is currently focused and hides the focus. */

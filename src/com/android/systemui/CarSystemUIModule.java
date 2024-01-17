@@ -19,14 +19,15 @@ package com.android.systemui;
 import static com.android.systemui.Dependency.ALLOW_NOTIFICATION_LONG_PRESS_NAME;
 import static com.android.systemui.Dependency.LEAK_REPORT_EMAIL_NAME;
 
-import android.car.app.CarTaskViewControllerHostLifecycle;
 import android.content.Context;
 import android.hardware.SensorPrivacyManager;
 import android.window.DisplayAreaOrganizer;
 
 import com.android.keyguard.KeyguardViewController;
+import com.android.keyguard.dagger.KeyguardDisplayModule;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedControllerImpl;
+import com.android.systemui.car.activity.window.ActivityWindowModule;
 import com.android.systemui.car.decor.CarPrivacyChipDecorProviderFactory;
 import com.android.systemui.car.decor.CarPrivacyChipViewController;
 import com.android.systemui.car.drivemode.DriveModeModule;
@@ -58,7 +59,6 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.NotificationLockscreenUserManagerImpl;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
-import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.policy.AospPolicyModule;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.HeadsUpEmptyImplModule;
@@ -90,8 +90,9 @@ import javax.inject.Named;
                 ReferenceScreenshotModule.class,
                 ShadeEmptyImplModule.class,
                 ShutdownUiModule.class,
-                StatusBarEventsModule.class,
-                DriveModeModule.class
+                DriveModeModule.class,
+                KeyguardDisplayModule.class,
+                ActivityWindowModule.class,
         }
 )
 abstract class CarSystemUIModule {
@@ -186,9 +187,4 @@ abstract class CarSystemUIModule {
     @Binds
     abstract PrivacyDotDecorProviderFactory providePrivacyDotDecorProviderFactory(
             CarPrivacyChipDecorProviderFactory carPrivacyDotDecorProviderFactory);
-
-    @Provides
-    static CarTaskViewControllerHostLifecycle provideCarTaskViewControllerHostLifecycle() {
-        return new CarTaskViewControllerHostLifecycle();
-    }
 }
