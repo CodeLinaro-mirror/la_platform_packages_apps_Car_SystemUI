@@ -70,6 +70,8 @@ import javax.inject.Provider;
 
 /**
  * A controller for a panel view associated with a status icon.
+ *
+ * @deprecated Please use {@link StatusIconPanelViewController} class.
  */
 public class StatusIconPanelController {
     private static final int DEFAULT_POPUP_WINDOW_ANCHOR_GRAVITY = Gravity.TOP | Gravity.START;
