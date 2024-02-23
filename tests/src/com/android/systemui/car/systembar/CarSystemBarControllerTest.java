@@ -51,7 +51,7 @@ import com.android.systemui.car.CarSystemUiTest;
 import com.android.systemui.car.statusbar.UserNameViewController;
 import com.android.systemui.car.statusicon.StatusIconPanelViewController;
 import com.android.systemui.car.statusicon.ui.QuickControlsEntryPointsController;
-import com.android.systemui.car.statusicon.ui.ReadOnlyIconsController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.plugins.DarkIconDispatcher;
@@ -103,13 +103,13 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     @Mock
     private QuickControlsEntryPointsController mQuickControlsEntryPointsController;
     @Mock
-    private ReadOnlyIconsController mReadOnlyIconsController;
-    @Mock
     private StatusIconPanelViewController.Builder mPanelControllerBuilder;
     @Mock
     private StatusIconPanelViewController mPanelController;
     @Mock
     private CarServiceProvider mCarServiceProvider;
+    @Mock
+    private CarSystemBarElementInitializer mCarSystemBarElementInitializer;
 
     @Before
     public void setUp() throws Exception {
@@ -122,8 +122,8 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mSpiedContext = spy(mContext);
         when(mSpiedContext.getSystemService(ActivityManager.class)).thenReturn(mActivityManager);
         mCarSystemBarViewFactory = new CarSystemBarViewFactory(mSpiedContext, mFeatureFlags,
-                mQuickControlsEntryPointsController, mReadOnlyIconsController,
-                mock(UserTracker.class));
+                mQuickControlsEntryPointsController, mock(UserTracker.class),
+                mCarSystemBarElementInitializer);
         setupPanelControllerBuilderMocks();
 
         // Needed to inflate top navigation bar.
