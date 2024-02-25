@@ -19,7 +19,6 @@ package com.android.systemui.car.statusicon;
 import static android.view.WindowManager.LayoutParams.TYPE_SYSTEM_DIALOG;
 import static android.widget.ListPopupWindow.WRAP_CONTENT;
 
-import android.annotation.ColorInt;
 import android.annotation.DimenRes;
 import android.annotation.LayoutRes;
 import android.app.PendingIntent;
@@ -38,12 +37,10 @@ import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.PopupWindow;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.car.qc.QCItem;
@@ -53,12 +50,9 @@ import com.android.car.ui.utils.CarUxRestrictionsUtil;
 import com.android.systemui.R;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
-import com.android.systemui.car.qc.QCFooterButton;
-import com.android.systemui.car.qc.QCFooterButtonView;
-import com.android.systemui.car.qc.QCHeaderReadOnlyIconsContainer;
-import com.android.systemui.car.qc.SystemUIQCView;
 import com.android.systemui.car.qc.SystemUIQCViewController;
-import com.android.systemui.car.statusicon.ui.QCPanelReadOnlyIconsController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
@@ -68,7 +62,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.inject.Inject;
-import javax.inject.Provider;
 
 /**
  * A controller for a panel view associated with a status icon.
@@ -79,15 +72,8 @@ public class StatusIconPanelViewController extends ViewController<View> {
     private final CarServiceProvider mCarServiceProvider;
     private final BroadcastDispatcher mBroadcastDispatcher;
     private final ConfigurationController mConfigurationController;
-    private final Provider<SystemUIQCViewController> mQCViewControllerProvider;
-    @Nullable
-    private final QCPanelReadOnlyIconsController mQCPanelReadOnlyIconsController;
+    private final CarSystemBarElementInitializer mCarSystemBarElementInitializer;
     private final String mIdentifier;
-    private final String mIconTag;
-    @ColorInt
-    private final int mIconHighlightedColor;
-    @ColorInt
-    private final int mIconNotHighlightedColor;
     @LayoutRes
     private final int mPanelLayoutRes;
     @DimenRes
@@ -101,7 +87,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
 
     private PopupWindow mPanel;
     private ViewGroup mPanelContent;
-    private ImageView mStatusIconView;
     private CarUxRestrictionsUtil mCarUxRestrictionsUtil;
     private CarActivityManager mCarActivityManager;
     private float mDimValue = -1.0f;
@@ -187,8 +172,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
             CarServiceProvider carServiceProvider,
             BroadcastDispatcher broadcastDispatcher,
             ConfigurationController configurationController,
-            Provider<SystemUIQCViewController> qcViewControllerProvider,
-            QCPanelReadOnlyIconsController qcPanelReadOnlyIconsController,
+            CarSystemBarElementInitializer elementInitializer,
             View anchorView, @LayoutRes int layoutRes, @DimenRes int widthRes,
             int xOffset, int yOffset, int gravity, boolean isDisabledWhileDriving,
             boolean showAsDropDown) {
@@ -198,8 +182,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
         mCarServiceProvider = carServiceProvider;
         mBroadcastDispatcher = broadcastDispatcher;
         mConfigurationController = configurationController;
-        mQCViewControllerProvider = qcViewControllerProvider;
-        mQCPanelReadOnlyIconsController = qcPanelReadOnlyIconsController;
+        mCarSystemBarElementInitializer = elementInitializer;
         mIsDisabledWhileDriving = isDisabledWhileDriving;
         mPanelLayoutRes = layoutRes;
         mPanelWidthRes = widthRes;
@@ -208,9 +191,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
         mPanelGravity = gravity;
         mShowAsDropDown = showAsDropDown;
         mIdentifier = Integer.toString(System.identityHashCode(this));
-        mIconTag = mContext.getResources().getString(R.string.qc_icon_tag);
-        mIconHighlightedColor = mContext.getColor(R.color.status_icon_highlighted_color);
-        mIconNotHighlightedColor = mContext.getColor(R.color.status_icon_not_highlighted_color);
     }
 
     @Override
@@ -236,8 +216,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
             // Dismiss all currently open system dialogs before opening this panel.
             dismissAllSystemDialogs();
 
-            mQCViewControllers.forEach(controller -> controller.listen(true));
-
             registerFocusListener(true);
 
             if (CarSystemUIUserUtil.isMUMDSystemUI()
@@ -259,7 +237,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
                     mPanel.showAtLocation(mView, mPanelGravity, mXOffsetPixel, mYOffsetPixel);
                 }
                 mView.setSelected(true);
-                highlightStatusIcon(true);
                 setAnimatedStatusIconHighlightedStatus(true);
                 dimBehind(mPanel);
             }
@@ -314,18 +291,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
     }
 
     @VisibleForTesting
-    @ColorInt
-    int getIconHighlightedColor() {
-        return mIconHighlightedColor;
-    }
-
-    @VisibleForTesting
-    @ColorInt
-    int getIconNotHighlightedColor() {
-        return mIconNotHighlightedColor;
-    }
-
-    @VisibleForTesting
     View.OnClickListener getOnClickListener() {
         return mOnClickListener;
     }
@@ -369,9 +334,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
         mPanelContent.setClipToOutline(true);
 
         // initialize special views
-        initializeQcHeaderViews(mPanelContent);
-        initializeQcViews(mPanelContent);
-        initializeQcFooterViews(mPanelContent);
+        initQCElementViews(mPanelContent);
 
         // initialize panel
         mPanel = new PopupWindow(mPanelContent, panelWidth, WRAP_CONTENT);
@@ -382,9 +345,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
         mPanel.setOnDismissListener(() -> {
             setAnimatedStatusIconHighlightedStatus(false);
             mView.setSelected(false);
-            highlightStatusIcon(false);
             registerFocusListener(false);
-            mQCViewControllers.forEach(controller -> controller.listen(false));
         });
 
         return true;
@@ -431,7 +392,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
         mPanel.dismiss();
         mPanel = null;
         mPanelContent = null;
-        mQCViewControllers.forEach(SystemUIQCViewController::destroy);
+        mQCViewControllers.forEach(SystemUIQCViewController::destroyQCViews);
         mQCViewControllers.clear();
     }
 
@@ -440,34 +401,15 @@ public class StatusIconPanelViewController extends ViewController<View> {
         createPanel();
     }
 
-    private void initializeQcHeaderViews(ViewGroup rootView) {
-        if (mQCPanelReadOnlyIconsController == null) return;
-        List<QCHeaderReadOnlyIconsContainer> views = findViewsOfType(rootView,
-                QCHeaderReadOnlyIconsContainer.class);
-        for (QCHeaderReadOnlyIconsContainer view : views) {
-            mQCPanelReadOnlyIconsController.addIconViews(view, /* shouldAttachPanel= */ false);
-        }
-    }
-
-    private void initializeQcViews(ViewGroup rootView) {
-        List<SystemUIQCView> views = findViewsOfType(rootView, SystemUIQCView.class);
-        for (SystemUIQCView view : views) {
-            SystemUIQCViewController controller = mQCViewControllerProvider.get();
-            controller.attachView(view);
-            mQCViewControllers.add(controller);
-            view.setActionListener(mQCActionListener);
-        }
-    }
-
-    private void initializeQcFooterViews(ViewGroup rootView) {
-        List<QCFooterButton> buttons = findViewsOfType(rootView, QCFooterButton.class);
-        for (QCFooterButton button : buttons) {
-            button.setUserTracker(mUserTracker);
-        }
-        List<QCFooterButtonView> buttonViews = findViewsOfType(rootView, QCFooterButtonView.class);
-        for (QCFooterButtonView buttonView : buttonViews) {
-            buttonView.setUserTracker(mUserTracker);
-            buttonView.setBroadcastDispatcher(mBroadcastDispatcher);
+    private void initQCElementViews(ViewGroup rootView) {
+        List<CarSystemBarElementController> controllers =
+                mCarSystemBarElementInitializer.initializeCarSystemBarElements(rootView);
+        for (CarSystemBarElementController controller : controllers) {
+            if (controller instanceof SystemUIQCViewController) {
+                SystemUIQCViewController qcController = (SystemUIQCViewController) controller;
+                qcController.setActionListener(mQCActionListener);
+                mQCViewControllers.add(qcController);
+            }
         }
     }
 
@@ -487,19 +429,6 @@ public class StatusIconPanelViewController extends ViewController<View> {
     private void setAnimatedStatusIconHighlightedStatus(boolean isHighlighted) {
         if (mView instanceof AnimatedStatusIcon) {
             ((AnimatedStatusIcon) mView).setIconHighlighted(isHighlighted);
-        }
-    }
-
-    private void highlightStatusIcon(boolean isHighlighted) {
-        if (mStatusIconView == null) {
-            mStatusIconView = mView.findViewWithTag(mIconTag);
-        }
-
-        if (mStatusIconView != null) {
-            // Icon color is set here since the status icon itself does not receive the selection
-            // state - only the outer button view does.
-            mStatusIconView.setColorFilter(
-                    isHighlighted ? mIconHighlightedColor : mIconNotHighlightedColor);
         }
     }
 
@@ -532,8 +461,7 @@ public class StatusIconPanelViewController extends ViewController<View> {
         private final CarServiceProvider mCarServiceProvider;
         private final BroadcastDispatcher mBroadcastDispatcher;
         private final ConfigurationController mConfigurationController;
-        private final Provider<SystemUIQCViewController> mQCViewControllerProvider;
-        private final QCPanelReadOnlyIconsController mQCPanelReadOnlyIconsController;
+        private final CarSystemBarElementInitializer mCarSystemBarElementInitializer;
 
         private int mXOffset = 0;
         private int mYOffset;
@@ -548,15 +476,13 @@ public class StatusIconPanelViewController extends ViewController<View> {
                 CarServiceProvider carServiceProvider,
                 BroadcastDispatcher broadcastDispatcher,
                 ConfigurationController configurationController,
-                Provider<SystemUIQCViewController> qcViewControllerProvider,
-                QCPanelReadOnlyIconsController qcPanelReadOnlyIconsController) {
+                CarSystemBarElementInitializer elementInitializer) {
             mContext = context;
             mUserTracker = userTracker;
             mCarServiceProvider = carServiceProvider;
             mBroadcastDispatcher = broadcastDispatcher;
             mConfigurationController = configurationController;
-            mQCViewControllerProvider = qcViewControllerProvider;
-            mQCPanelReadOnlyIconsController = qcPanelReadOnlyIconsController;
+            mCarSystemBarElementInitializer = elementInitializer;
 
             int panelMarginTop = mContext.getResources().getDimensionPixelSize(
                     R.dimen.car_status_icon_panel_margin_top);
@@ -606,9 +532,9 @@ public class StatusIconPanelViewController extends ViewController<View> {
         public StatusIconPanelViewController build(View anchorView, @LayoutRes int layoutRes,
                 @DimenRes int widthRes) {
             return new StatusIconPanelViewController(mContext, mUserTracker, mCarServiceProvider,
-                    mBroadcastDispatcher, mConfigurationController, mQCViewControllerProvider,
-                    mQCPanelReadOnlyIconsController, anchorView, layoutRes, widthRes, mXOffset,
-                    mYOffset, mGravity, mIsDisabledWhileDriving, mShowAsDropDown);
+                    mBroadcastDispatcher, mConfigurationController, mCarSystemBarElementInitializer,
+                    anchorView, layoutRes, widthRes, mXOffset, mYOffset, mGravity,
+                    mIsDisabledWhileDriving, mShowAsDropDown);
         }
     }
 }
