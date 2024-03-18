@@ -24,13 +24,18 @@ import android.view.ViewGroup;
 
 import androidx.annotation.LayoutRes;
 
+import com.android.car.dockutil.Flags;
 import com.android.car.ui.FocusParkingView;
 import com.android.systemui.R;
 import com.android.systemui.car.statusicon.ui.QuickControlsEntryPointsController;
-import com.android.systemui.car.statusicon.ui.ReadOnlyIconsController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.settings.UserTracker;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -62,9 +67,10 @@ public class CarSystemBarViewFactory {
     private final ArrayMap<Type, ViewGroup> mCachedContainerMap = new ArrayMap<>();
     private final FeatureFlags mFeatureFlags;
     private final QuickControlsEntryPointsController mQuickControlsEntryPointsController;
-    private final ReadOnlyIconsController mReadOnlyIconsController;
     private final UserTracker mUserTracker;
-    private final boolean mIsDockEnabled;
+    private final CarSystemBarElementInitializer mCarSystemBarElementInitializer;
+    private final List<CarSystemBarElementController> mCarSystemBarElementControllers =
+            new ArrayList<>();
 
     /** Type of navigation bar to be created. */
     private enum Type {
@@ -85,15 +91,14 @@ public class CarSystemBarViewFactory {
             Context context,
             FeatureFlags featureFlags,
             QuickControlsEntryPointsController quickControlsEntryPointsController,
-            ReadOnlyIconsController readOnlyIconsController,
-            UserTracker userTracker
+            UserTracker userTracker,
+            CarSystemBarElementInitializer elementInitializer
     ) {
         mContext = context;
         mFeatureFlags = featureFlags;
         mQuickControlsEntryPointsController = quickControlsEntryPointsController;
-        mReadOnlyIconsController = readOnlyIconsController;
         mUserTracker = userTracker;
-        mIsDockEnabled = context.getResources().getBoolean(R.bool.config_enableDock);
+        mCarSystemBarElementInitializer = elementInitializer;
     }
 
     /** Gets the top window. */
@@ -118,7 +123,7 @@ public class CarSystemBarViewFactory {
 
     /** Gets the top bar. */
     public CarSystemBarView getTopBar(boolean isSetUp) {
-        if (mIsDockEnabled) {
+        if (Flags.dockFeature()) {
             return getBar(isSetUp, Type.TOP_WITH_DOCK, Type.TOP_UNPROVISIONED);
         }
         return getBar(isSetUp, Type.TOP, Type.TOP_UNPROVISIONED);
@@ -126,7 +131,7 @@ public class CarSystemBarViewFactory {
 
     /** Gets the bottom bar. */
     public CarSystemBarView getBottomBar(boolean isSetUp) {
-        if (mIsDockEnabled) {
+        if (Flags.dockFeature()) {
             return getBar(isSetUp, Type.BOTTOM_WITH_DOCK, Type.BOTTOM_UNPROVISIONED);
         }
         return getBar(isSetUp, Type.BOTTOM, Type.BOTTOM_UNPROVISIONED);
@@ -181,8 +186,9 @@ public class CarSystemBarViewFactory {
 
         view.setupHvacButton();
         view.setupQuickControlsEntryPoints(mQuickControlsEntryPointsController, isSetUp);
-        view.setupReadOnlyIcons(mReadOnlyIconsController);
         view.setupSystemBarButtons(mUserTracker);
+        mCarSystemBarElementControllers.addAll(
+                mCarSystemBarElementInitializer.initializeCarSystemBarElements(view));
 
         // Include a FocusParkingView at the beginning. The rotary controller "parks" the focus here
         // when the user navigates to another window. This is also used to prevent wrap-around.
@@ -208,7 +214,6 @@ public class CarSystemBarViewFactory {
     /** Resets the cached system bar views. */
     protected void resetSystemBarViewCache() {
         mQuickControlsEntryPointsController.resetCache();
-        mReadOnlyIconsController.resetCache();
         mCachedViewMap.clear();
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,23 +21,23 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.eq;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertThrows;
 
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.UserHandle;
-import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.widget.ImageView;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.car.qc.QCItem;
 import com.android.car.ui.FocusParkingView;
@@ -46,7 +46,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.CarSystemUiTest;
-import com.android.systemui.car.qc.SystemUIQCViewController;
+import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 
@@ -62,10 +62,9 @@ import org.mockito.MockitoAnnotations;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 @SmallTest
-public class StatusIconPanelControllerTest extends SysuiTestCase {
-    private StatusIconPanelController mStatusIconPanelController;
+public class StatusIconPanelViewControllerTest extends SysuiTestCase {
+    private StatusIconPanelViewController mViewController;
     private ImageView mAnchorView;
-    private String mIconTag;
     private UserHandle mUserHandle;
 
     @Mock
@@ -77,33 +76,54 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
     @Mock
     private ConfigurationController mConfigurationController;
     @Mock
-    private SystemUIQCViewController mSystemUIQCViewController;
+    private CarSystemBarElementInitializer mCarSystemBarElementInitializer;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
 
         mContext = spy(mContext);
-        mIconTag = mContext.getResources().getString(R.string.qc_icon_tag);
         mUserHandle = UserHandle.of(1000);
         when(mUserTracker.getUserHandle()).thenReturn(mUserHandle);
 
-        mStatusIconPanelController = new StatusIconPanelController(mContext, mUserTracker,
-                mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
-                () -> mSystemUIQCViewController);
-        spyOn(mStatusIconPanelController);
         mAnchorView = spy(new ImageView(mContext));
-        mAnchorView.setTag(mIconTag);
+        mAnchorView.setTag(mContext.getResources().getString(R.string.qc_icon_tag));
         mAnchorView.setImageDrawable(mContext.getDrawable(R.drawable.ic_bluetooth_status_off));
-        mAnchorView.setColorFilter(mStatusIconPanelController.getIconHighlightedColor());
+        mAnchorView.setColorFilter(mContext.getColor(R.color.car_status_icon_color));
+        mViewController = new StatusIconPanelViewController.Builder(mContext, mUserTracker,
+                mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
+                mCarSystemBarElementInitializer).build(mAnchorView,
+                R.layout.qc_display_panel, R.dimen.car_status_icon_panel_default_width);
+        spyOn(mViewController);
         reset(mAnchorView);
-        mStatusIconPanelController.attachPanel(mAnchorView, R.layout.qc_display_panel,
-                R.dimen.car_status_icon_panel_default_width);
+        mViewController.init();
     }
 
     @After
     public void tearDown() {
-        mStatusIconPanelController.destroyPanel();
+        // The view controller must be detached before we move on since it creates a real
+        // PopupWindow instance. Otherwise, the window will continue to be present and cause
+        // instability in future tests.
+        mViewController.onViewDetached();
+    }
+
+    @Test
+    public void onViewAttached_registersListeners() {
+        mViewController.onViewAttached();
+        verify(mBroadcastDispatcher).registerReceiver(any(), any(), any(), any());
+        verify(mUserTracker).addCallback(any(), any());
+        verify(mConfigurationController).addCallback(any());
+        verify(mCarServiceProvider).addListener(any());
+    }
+
+    @Test
+    public void onViewDetached_unregistersListeners() {
+        mViewController.onViewDetached();
+        verify(mCarServiceProvider).removeListener(any());
+        verify(mConfigurationController).removeCallback(any());
+        verify(mUserTracker).removeCallback(any());
+        verify(mBroadcastDispatcher).unregisterReceiver(any());
+        assertThat(mViewController.getPanel()).isNull();
     }
 
     @Test
@@ -111,15 +131,7 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isTrue();
-    }
-
-    @Test
-    public void onPanelAnchorViewClicked_statusIconHighlighted() {
-        clickAnchorView();
-        waitForIdleSync();
-
-        verify(mAnchorView).setColorFilter(mStatusIconPanelController.getIconHighlightedColor());
+        assertThat(mViewController.getPanel().isShowing()).isTrue();
     }
 
     @Test
@@ -129,17 +141,7 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isFalse();
-    }
-
-    @Test
-    public void onPanelAnchorViewClicked_panelShowing_statusIconNotHighlighted() {
-        clickAnchorView();
-
-        clickAnchorView();
-        waitForIdleSync();
-
-        verify(mAnchorView).setColorFilter(mStatusIconPanelController.getIconNotHighlightedColor());
+        assertThat(mViewController.getPanel().isShowing()).isFalse();
     }
 
     @Test
@@ -153,33 +155,20 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         assertThat(argumentCaptor.getValue().getAction()).isEqualTo(
                 Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
         assertThat(argumentCaptor.getValue().getIdentifier()).isEqualTo(
-                mStatusIconPanelController.getIdentifier());
+                mViewController.getIdentifier());
     }
 
     @Test
     public void onDismissSystemDialogReceived_fromSelf_panelOpen_doesNotDismissPanel() {
         Intent intent = new Intent();
         intent.setAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
-        intent.setIdentifier(mStatusIconPanelController.getIdentifier());
+        intent.setIdentifier(mViewController.getIdentifier());
         clickAnchorView();
         waitForIdleSync();
 
-        mStatusIconPanelController.getBroadcastReceiver().onReceive(mContext, intent);
+        mViewController.getBroadcastReceiver().onReceive(mContext, intent);
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isTrue();
-    }
-
-    @Test
-    public void onDismissSystemDialogReceived_fromSelf_panelOpen_statusIconHighlighted() {
-        Intent intent = new Intent();
-        intent.setAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
-        intent.setIdentifier(mStatusIconPanelController.getIdentifier());
-        clickAnchorView();
-        waitForIdleSync();
-
-        mStatusIconPanelController.getBroadcastReceiver().onReceive(mContext, intent);
-
-        verify(mAnchorView).setColorFilter(mStatusIconPanelController.getIconHighlightedColor());
+        assertThat(mViewController.getPanel().isShowing()).isTrue();
     }
 
     @Test
@@ -189,46 +178,17 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        mStatusIconPanelController.getBroadcastReceiver().onReceive(mContext, intent);
+        mViewController.getBroadcastReceiver().onReceive(mContext, intent);
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isFalse();
-    }
-
-    @Test
-    public void onDismissSystemDialogReceived_notFromSelf_panelOpen_statusIconNotHighlighted() {
-        Intent intent = new Intent();
-        intent.setAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
-        clickAnchorView();
-        waitForIdleSync();
-
-        mStatusIconPanelController.getBroadcastReceiver().onReceive(mContext, intent);
-
-        verify(mAnchorView).setColorFilter(mStatusIconPanelController.getIconNotHighlightedColor());
-    }
-
-    @Test
-    public void onDestroy_unregistersListeners() {
-        mStatusIconPanelController.destroyPanel();
-
-        verify(mConfigurationController).removeCallback(any());
-        verify(mBroadcastDispatcher).unregisterReceiver(any());
-    }
-
-    @Test
-    public void onDestroy_reAttach_throwsException() {
-        mStatusIconPanelController.destroyPanel();
-
-        assertThrows(IllegalStateException.class, () -> mStatusIconPanelController.attachPanel(
-                mAnchorView, R.layout.qc_display_panel,
-                R.dimen.car_status_icon_panel_default_width));
+        assertThat(mViewController.getPanel().isShowing()).isFalse();
     }
 
     @Test
     public void onLayoutDirectionChanged_recreatePanel() {
-        mStatusIconPanelController.getConfigurationListener()
+        mViewController.getConfigurationListener()
                 .onLayoutDirectionChanged(/* isLayoutRtl= */ true);
 
-        assertThat(mStatusIconPanelController.getPanel()).isNotNull();
+        assertThat(mViewController.getPanel()).isNotNull();
     }
 
     @Test
@@ -237,13 +197,13 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         Context userContext = mock(Context.class);
         reset(mBroadcastDispatcher);
 
-        mStatusIconPanelController.getUserTrackerCallback()
+        mViewController.getUserTrackerCallback()
                 .onUserChanged(newUser, userContext);
 
         verify(mBroadcastDispatcher).unregisterReceiver(
-                eq(mStatusIconPanelController.getBroadcastReceiver()));
+                eq(mViewController.getBroadcastReceiver()));
         verify(mBroadcastDispatcher).registerReceiver(
-                eq(mStatusIconPanelController.getBroadcastReceiver()),
+                eq(mViewController.getBroadcastReceiver()),
                 any(IntentFilter.class), eq(null), eq(mUserHandle));
     }
 
@@ -253,10 +213,10 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        mStatusIconPanelController.getFocusChangeListener()
+        mViewController.getFocusChangeListener()
                 .onGlobalFocusChanged(mAnchorView, newFocusView);
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isFalse();
+        assertThat(mViewController.getPanel().isShowing()).isFalse();
     }
 
     @Test
@@ -267,9 +227,9 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        mStatusIconPanelController.getQCActionListener().onQCAction(qcItem, action);
+        mViewController.getQCActionListener().onQCAction(qcItem, action);
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isFalse();
+        assertThat(mViewController.getPanel().isShowing()).isFalse();
     }
 
     @Test
@@ -280,12 +240,12 @@ public class StatusIconPanelControllerTest extends SysuiTestCase {
         clickAnchorView();
         waitForIdleSync();
 
-        mStatusIconPanelController.getQCActionListener().onQCAction(qcItem, action);
+        mViewController.getQCActionListener().onQCAction(qcItem, action);
 
-        assertThat(mStatusIconPanelController.getPanel().isShowing()).isFalse();
+        assertThat(mViewController.getPanel().isShowing()).isFalse();
     }
 
     private void clickAnchorView() {
-        mStatusIconPanelController.getOnClickListener().onClick(mAnchorView);
+        mViewController.getOnClickListener().onClick(mAnchorView);
     }
 }

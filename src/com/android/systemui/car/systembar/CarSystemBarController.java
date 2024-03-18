@@ -16,6 +16,9 @@
 
 package com.android.systemui.car.systembar;
 
+import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_SWITCHING;
+import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_UNLOCKED;
+
 import static com.android.systemui.car.systembar.SystemBarConfigs.BOTTOM;
 import static com.android.systemui.car.systembar.SystemBarConfigs.LEFT;
 import static com.android.systemui.car.systembar.SystemBarConfigs.RIGHT;
@@ -24,8 +27,10 @@ import static com.android.systemui.car.systembar.SystemBarConfigs.TOP;
 import android.annotation.LayoutRes;
 import android.app.ActivityManager;
 import android.app.StatusBarManager;
+import android.car.user.CarUserManager;
 import android.content.Context;
 import android.os.Build;
+import android.os.UserManager;
 import android.util.ArraySet;
 import android.util.Log;
 import android.view.Gravity;
@@ -38,23 +43,19 @@ import androidx.annotation.Nullable;
 
 import com.android.car.docklib.DockViewController;
 import com.android.car.docklib.view.DockView;
+import com.android.car.dockutil.Flags;
 import com.android.car.ui.FocusParkingView;
 import com.android.car.ui.utils.ViewUtils;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.R;
-import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.hvac.HvacPanelOverlayViewController;
 import com.android.systemui.car.notification.NotificationPanelViewController;
-import com.android.systemui.car.privacy.CameraPrivacyElementsProviderImpl;
-import com.android.systemui.car.privacy.MicPrivacyElementsProviderImpl;
-import com.android.systemui.car.qc.SystemUIQCViewController;
 import com.android.systemui.car.statusbar.UserNameViewController;
-import com.android.systemui.car.statusicon.StatusIconPanelController;
+import com.android.systemui.car.statusicon.StatusIconPanelViewController;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.settings.UserTracker;
-import com.android.systemui.statusbar.policy.ConfigurationController;
 
 import dagger.Lazy;
 
@@ -73,18 +74,14 @@ public class CarSystemBarController {
 
     private final Context mContext;
     private final UserTracker mUserTracker;
+    private final UserManager mUserManager;
     private final CarSystemBarViewFactory mCarSystemBarViewFactory;
-    private final CarServiceProvider mCarServiceProvider;
-    private final BroadcastDispatcher mBroadcastDispatcher;
-    private final ConfigurationController mConfigurationController;
     private final ButtonSelectionStateController mButtonSelectionStateController;
     private final ButtonRoleHolderController mButtonRoleHolderController;
-    private final Provider<SystemUIQCViewController> mQCViewControllerProvider;
+    private final Provider<StatusIconPanelViewController.Builder> mPanelControllerBuilderProvider;
     private final Lazy<UserNameViewController> mUserNameViewControllerLazy;
     private final Lazy<MicPrivacyChipViewController> mMicPrivacyChipViewControllerLazy;
     private final Lazy<CameraPrivacyChipViewController> mCameraPrivacyChipViewControllerLazy;
-    private final Lazy<MicPrivacyElementsProviderImpl> mMicPrivacyElementsProviderLazy;
-    private final Lazy<CameraPrivacyElementsProviderImpl> mCameraPrivacyElementsProviderLazy;
 
     private final SystemBarConfigs mSystemBarConfigs;
     private boolean mShowTop;
@@ -109,9 +106,9 @@ public class CarSystemBarController {
 
     private NotificationsShadeController mNotificationsShadeController;
     private HvacPanelController mHvacPanelController;
-    private StatusIconPanelController mMicPanelController;
-    private StatusIconPanelController mCameraPanelController;
-    private StatusIconPanelController mProfilePanelController;
+    private StatusIconPanelViewController mMicPanelController;
+    private StatusIconPanelViewController mCameraPanelController;
+    private StatusIconPanelViewController mProfilePanelController;
     private HvacPanelOverlayViewController mHvacPanelOverlayViewController;
     private NotificationPanelViewController mNotificationPanelViewController;
 
@@ -125,55 +122,60 @@ public class CarSystemBarController {
     // Saved StatusBarManager.Disable2Flags
     private int mStatusBarState2;
     private int mLockTaskMode;
-    private boolean mIsBootComplete;
-    private final boolean mIsDockEnabled;
     private DockViewController mDockViewController;
+    private int mActiveUnlockedUserId;
 
     public CarSystemBarController(Context context,
             UserTracker userTracker,
             CarSystemBarViewFactory carSystemBarViewFactory,
             CarServiceProvider carServiceProvider,
-            BroadcastDispatcher broadcastDispatcher,
-            ConfigurationController configurationController,
             ButtonSelectionStateController buttonSelectionStateController,
             Lazy<UserNameViewController> userNameViewControllerLazy,
             Lazy<MicPrivacyChipViewController> micPrivacyChipViewControllerLazy,
             Lazy<CameraPrivacyChipViewController> cameraPrivacyChipViewControllerLazy,
             ButtonRoleHolderController buttonRoleHolderController,
             SystemBarConfigs systemBarConfigs,
-            Provider<SystemUIQCViewController> qcViewControllerProvider,
-            Lazy<MicPrivacyElementsProviderImpl> micPrivacyElementsProvider,
-            Lazy<CameraPrivacyElementsProviderImpl> cameraPrivacyElementsProvider) {
+            Provider<StatusIconPanelViewController.Builder> panelControllerBuilderProvider) {
         mContext = context;
         mUserTracker = userTracker;
         mCarSystemBarViewFactory = carSystemBarViewFactory;
-        mCarServiceProvider = carServiceProvider;
-        mBroadcastDispatcher = broadcastDispatcher;
-        mConfigurationController = configurationController;
         mButtonSelectionStateController = buttonSelectionStateController;
         mUserNameViewControllerLazy = userNameViewControllerLazy;
         mMicPrivacyChipViewControllerLazy = micPrivacyChipViewControllerLazy;
         mCameraPrivacyChipViewControllerLazy = cameraPrivacyChipViewControllerLazy;
         mButtonRoleHolderController = buttonRoleHolderController;
-        mQCViewControllerProvider = qcViewControllerProvider;
-        mMicPrivacyElementsProviderLazy = micPrivacyElementsProvider;
-        mCameraPrivacyElementsProviderLazy = cameraPrivacyElementsProvider;
+        mPanelControllerBuilderProvider = panelControllerBuilderProvider;
         mSystemBarConfigs = systemBarConfigs;
 
         // Read configuration.
         readConfigs();
         mPrivacyChipXOffset = -context.getResources()
                 .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
+        mUserManager = context.getSystemService(UserManager.class);
 
-        mIsDockEnabled = context.getResources().getBoolean(R.bool.config_enableDock);
-    }
+        carServiceProvider.addListener(car -> {
+            CarUserManager carUserManager = car.getCarManager(CarUserManager.class);
+            carUserManager.addListener(mContext.getMainExecutor(),
+                    event -> {
+                        if (event.getUserHandle().isSystem()) {
+                            return;
+                        }
 
-    /**
-     * Notify the controller the boot is completed.
-     */
-    public void bootCompleted(boolean isSetUp) {
-        mIsBootComplete = true;
-        setupDock(mBottomView, isSetUp);
+                        switch (event.getEventType()) {
+                            case USER_LIFECYCLE_EVENT_TYPE_UNLOCKED -> {
+                                if (event.getUserId() == mUserTracker.getUserId()) {
+                                    mActiveUnlockedUserId = event.getUserId();
+                                    setupDock(mBottomView);
+                                }
+                            }
+                            case USER_LIFECYCLE_EVENT_TYPE_SWITCHING -> {
+                                if (event.getPreviousUserId() == mActiveUnlockedUserId) {
+                                    destroyDock();
+                                }
+                            }
+                        }
+                    });
+        });
     }
 
     private void readConfigs() {
@@ -211,23 +213,11 @@ public class CarSystemBarController {
         mMicPrivacyChipViewControllerLazy.get().removeAll();
         mCameraPrivacyChipViewControllerLazy.get().removeAll();
 
-        if (mMicPanelController != null) {
-            mMicPanelController.destroyPanel();
-        }
-        if (mCameraPanelController != null) {
-            mCameraPanelController.destroyPanel();
-        }
-        if (mProfilePanelController != null) {
-            mProfilePanelController.destroyPanel();
-        }
         mMicPanelController = null;
         mCameraPanelController = null;
         mProfilePanelController = null;
 
-        if (mDockViewController != null) {
-            mDockViewController.destroy();
-            mDockViewController = null;
-        }
+        destroyDock();
     }
 
     /** Gets the top window if configured to do so. */
@@ -359,8 +349,6 @@ public class CarSystemBarController {
                 "qc_entry_points_container");
         setDisabledSystemBarContainer(R.id.user_name_container, qcDisabled,
                 "user_name_container");
-        setDisabledSystemBarContainer(R.id.read_only_icons_container, systemIconsDisabled,
-                "read_only_icons_container");
 
         if (DEBUG) {
             Log.d(TAG, "refreshSystemBar: locked?: " + locked
@@ -435,22 +423,9 @@ public class CarSystemBarController {
         setupBar(mBottomView, mBottomBarTouchListeners, mNotificationsShadeController,
                 mHvacPanelController, mHvacPanelOverlayViewController,
                 mNotificationPanelViewController);
-        setupDock(mBottomView, isSetUp);
+        setupDock(mBottomView);
 
         return mBottomView;
-    }
-
-    private void setupDock(CarSystemBarView carSystemBarView, boolean isSetUp) {
-        if (isSetUp && mIsBootComplete && mIsDockEnabled
-                && carSystemBarView != null && mDockViewController == null) {
-            // todo(b/317818339): init dock before boot complete
-            // We do not want the Dock to be available in a non provisioned state
-            DockView dockView = carSystemBarView.findViewById(R.id.dock);
-            if (dockView != null) {
-                mDockViewController = new DockViewController(dockView,
-                        mUserTracker.getUserContext());
-            }
-        }
     }
 
     /** Gets the left navigation bar with the appropriate listeners set. */
@@ -500,21 +475,19 @@ public class CarSystemBarController {
         mCameraPrivacyChipViewControllerLazy.get().addPrivacyChipView(view);
     }
 
-    private StatusIconPanelController setupSensorQcPanel(
-            @Nullable StatusIconPanelController panelController, int chipId,
+    private StatusIconPanelViewController setupSensorQcPanel(
+            @Nullable StatusIconPanelViewController panelController, int chipId,
             @LayoutRes int panelLayoutRes) {
         if (panelController == null) {
-            panelController = new StatusIconPanelController(mContext, mUserTracker,
-                    mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
-                    mQCViewControllerProvider);
             View privacyChip = mTopView.findViewById(chipId);
             if (privacyChip != null) {
-                panelController.attachPanel(privacyChip, panelLayoutRes,
-                        R.dimen.car_sensor_qc_panel_width, mPrivacyChipXOffset,
-                        panelController.getDefaultYOffset(), Gravity.TOP | Gravity.END);
+                panelController = mPanelControllerBuilderProvider.get()
+                        .setXOffset(mPrivacyChipXOffset)
+                        .setGravity(Gravity.TOP | Gravity.END)
+                        .build(privacyChip, panelLayoutRes, R.dimen.car_sensor_qc_panel_width);
+                panelController.init();
             }
         }
-
         return panelController;
     }
 
@@ -523,11 +496,12 @@ public class CarSystemBarController {
         if (mProfilePanelController == null && profilePickerView != null) {
             boolean profilePanelDisabledWhileDriving = mContext.getResources().getBoolean(
                     R.bool.config_profile_panel_disabled_while_driving);
-            mProfilePanelController = new StatusIconPanelController(mContext, mUserTracker,
-                    mCarServiceProvider, mBroadcastDispatcher, mConfigurationController,
-                    mQCViewControllerProvider, profilePanelDisabledWhileDriving);
-            mProfilePanelController.attachPanel(profilePickerView, R.layout.qc_profile_switcher,
-                    R.dimen.car_profile_quick_controls_panel_width, Gravity.TOP | Gravity.END);
+            mProfilePanelController = mPanelControllerBuilderProvider.get()
+                    .setGravity(Gravity.TOP | Gravity.END)
+                    .setDisabledWhileDriving(profilePanelDisabledWhileDriving)
+                    .build(profilePickerView, R.layout.qc_profile_switcher,
+                            R.dimen.car_profile_quick_controls_panel_width);
+            mProfilePanelController.init();
         }
     }
 
@@ -812,5 +786,46 @@ public class CarSystemBarController {
         if (focusedView == null) return false;
         focusedView.requestFocus();
         return true;
+    }
+
+    private void setupDock(CarSystemBarView carSystemBarView) {
+        if (!Flags.dockFeature()) {
+            return;
+        }
+
+        if (carSystemBarView == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Dock cannot be initialised: CarSystemBarView is null");
+            }
+            return;
+        }
+
+        if (mDockViewController != null) {
+            if (DEBUG) {
+                Log.d(TAG, "Dock already initialized");
+            }
+            return;
+        }
+        DockView dockView = carSystemBarView.findViewById(R.id.dock);
+        if (dockView == null) {
+            if (DEBUG) {
+                Log.d(TAG, "Dock cannot be initialised: Cannot find dock view");
+            }
+            return;
+        }
+        if (!mUserManager.isUserUnlocked(mUserTracker.getUserId())) {
+            if (DEBUG) {
+                Log.d(TAG, "Dock cannot be initialised: User not unlocked");
+            }
+            return;
+        }
+        mDockViewController = new DockViewController(dockView, mUserTracker.getUserContext());
+    }
+
+    private void destroyDock() {
+        if (mDockViewController != null) {
+            mDockViewController.destroy();
+            mDockViewController = null;
+        }
     }
 }
