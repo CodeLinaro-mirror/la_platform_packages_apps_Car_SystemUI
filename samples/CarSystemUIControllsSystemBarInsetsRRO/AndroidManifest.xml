@@ -1,6 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
-  ~ Copyright (C) 2023 The Android Open Source Project
+  ~ Copyright (C) 2024 The Android Open Source Project
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -14,14 +14,11 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-
-<!-- todo(b/304320644): update drawable/hvac_decrease_button -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="20dp"
-    android:height="4dp"
-    android:viewportWidth="20"
-    android:viewportHeight="4">
-    <path
-        android:pathData="M0.083,3.275V0.725H19.917V3.275H0.083Z"
-        android:fillColor="#5C5F5E"/>
-</vector>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.android.systemui.controls.systembar.insets.rro">
+    <overlay
+        android:targetPackage="android"
+        android:isStatic="false"
+        android:resourcesMap="@xml/overlays"
+    />
+</manifest>
