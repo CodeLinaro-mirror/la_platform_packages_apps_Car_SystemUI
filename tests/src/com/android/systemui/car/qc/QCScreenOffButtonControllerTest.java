@@ -26,13 +26,15 @@ import static org.mockito.Mockito.when;
 import android.car.Car;
 import android.car.hardware.power.CarPowerManager;
 import android.os.UserHandle;
-import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.CarSystemUiTest;
+import com.android.systemui.car.systembar.element.CarSystemBarElementStateController;
 import com.android.systemui.car.systembar.element.CarSystemBarElementStatusBarDisableController;
 import com.android.systemui.settings.UserTracker;
 
@@ -61,6 +63,8 @@ public class QCScreenOffButtonControllerTest extends SysuiTestCase {
     private CarServiceProvider mCarServiceProvider;
     @Mock
     private CarSystemBarElementStatusBarDisableController mDisableController;
+    @Mock
+    private CarSystemBarElementStateController mStateController;
 
     @Before
     public void setUp() {
@@ -69,8 +73,8 @@ public class QCScreenOffButtonControllerTest extends SysuiTestCase {
         mContext = spy(mContext);
         mView = spy(new QCFooterView(mContext));
         when(mUserTracker.getUserHandle()).thenReturn(UserHandle.of(1000));
-        mController = new QCScreenOffButtonController(mView, mDisableController, mContext,
-                mUserTracker, mCarServiceProvider);
+        mController = new QCScreenOffButtonController(mView, mDisableController,
+                mStateController, mContext, mUserTracker, mCarServiceProvider);
         mController.init();
 
         when(mCar.getCarManager(CarPowerManager.class)).thenReturn(mCarPowerManager);

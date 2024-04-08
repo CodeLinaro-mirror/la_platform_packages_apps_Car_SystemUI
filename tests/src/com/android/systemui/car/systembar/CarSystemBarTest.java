@@ -184,7 +184,8 @@ public class CarSystemBarTest extends SysuiTestCase {
                 mButtonSelectionStateListener, mExecutor, mUiBgExecutor, mBarService,
                 () -> mKeyguardStateController, () -> mIconPolicy, mHvacController, mSignalPolicy,
                 mSystemBarConfigs,
-                mock(ConfigurationController.class), displayTracker, Optional.empty(), null);
+                mock(ConfigurationController.class), mock(CarSystemBarRestartTracker.class),
+                displayTracker, Optional.empty(), null);
         mCarSystemBar.setSignalPolicy(mSignalPolicy);
     }
 
@@ -475,22 +476,6 @@ public class CarSystemBarTest extends SysuiTestCase {
         inOrder.verify(mockProfilePickerView).callOnClick();
         inOrder.verify(mockTopBarView).findViewById(R.id.user_name);
         inOrder.verify(mockProfilePickerView).callOnClick();
-    }
-
-    @Test
-    public void onConfigChanged_callQuickControlsOnClickFromClassName_forSelectedQuickControl() {
-        String clsName = "testClsName";
-        Configuration config = new Configuration();
-        config.uiMode = mContext.getResources().getConfiguration().isNightModeActive()
-                ? Configuration.UI_MODE_NIGHT_NO : Configuration.UI_MODE_NIGHT_YES;
-        when(mCarSystemBarController.getSelectedQuickControlsClassName()).thenReturn(clsName);
-        initCarSystemBar();
-
-        mCarSystemBar.start();
-        mCarSystemBar.onConfigChanged(config);
-
-        verify(mCarSystemBarController, times(2))
-                .callQuickControlsOnClickFromClassName(clsName);
     }
 
     @Test

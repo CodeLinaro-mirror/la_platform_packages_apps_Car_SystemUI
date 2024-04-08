@@ -41,14 +41,16 @@ import android.car.app.CarActivityManager;
 import android.content.DialogInterface;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.test.suitebuilder.annotation.SmallTest;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.view.Display;
 
+import androidx.test.filters.SmallTest;
+
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.CarSystemUiTest;
+import com.android.systemui.car.systembar.element.CarSystemBarElementStateController;
 import com.android.systemui.car.systembar.element.CarSystemBarElementStatusBarDisableController;
 import com.android.systemui.settings.UserTracker;
 
@@ -88,6 +90,8 @@ public class QCLogoutButtonControllerTest extends SysuiTestCase {
     private UserTracker mUserTracker;
     @Mock
     private CarSystemBarElementStatusBarDisableController mDisableController;
+    @Mock
+    private CarSystemBarElementStateController mStateController;
 
     private QCFooterView mView;
     private QCLogoutButtonController mController;
@@ -109,8 +113,8 @@ public class QCLogoutButtonControllerTest extends SysuiTestCase {
         when(mCar.getCarManager(CarActivityManager.class)).thenReturn(mCarActivityManager);
 
         mView = spy(new QCFooterView(mContext));
-        mController = spy(new QCLogoutButtonController(mView, mDisableController, mContext,
-                mUserTracker, mCarServiceProvider));
+        mController = spy(new QCLogoutButtonController(mView, mDisableController,
+                mStateController, mContext, mUserTracker, mCarServiceProvider));
         mController.init();
         attachCarService();
     }
