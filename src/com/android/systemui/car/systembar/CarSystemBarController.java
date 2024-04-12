@@ -42,6 +42,7 @@ import androidx.annotation.IdRes;
 import androidx.annotation.Nullable;
 
 import com.android.car.docklib.DockViewController;
+import com.android.car.docklib.data.DockProtoDataController;
 import com.android.car.docklib.view.DockView;
 import com.android.car.dockutil.Flags;
 import com.android.car.ui.FocusParkingView;
@@ -55,10 +56,12 @@ import com.android.systemui.car.statusbar.UserNameViewController;
 import com.android.systemui.car.statusicon.StatusIconPanelViewController;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.dagger.SysUISingleton;
+import com.android.systemui.settings.UserFileManager;
 import com.android.systemui.settings.UserTracker;
 
 import dagger.Lazy;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -122,6 +125,7 @@ public class CarSystemBarController {
     // Saved StatusBarManager.Disable2Flags
     private int mStatusBarState2;
     private int mLockTaskMode;
+    private final UserFileManager mUserFileManager;
     private DockViewController mDockViewController;
     private int mActiveUnlockedUserId;
 
@@ -135,7 +139,8 @@ public class CarSystemBarController {
             Lazy<CameraPrivacyChipViewController> cameraPrivacyChipViewControllerLazy,
             ButtonRoleHolderController buttonRoleHolderController,
             SystemBarConfigs systemBarConfigs,
-            Provider<StatusIconPanelViewController.Builder> panelControllerBuilderProvider) {
+            Provider<StatusIconPanelViewController.Builder> panelControllerBuilderProvider,
+            UserFileManager userFileManager) {
         mContext = context;
         mUserTracker = userTracker;
         mCarSystemBarViewFactory = carSystemBarViewFactory;
@@ -152,6 +157,7 @@ public class CarSystemBarController {
         mPrivacyChipXOffset = -context.getResources()
                 .getDimensionPixelOffset(R.dimen.privacy_chip_horizontal_padding);
         mUserManager = context.getSystemService(UserManager.class);
+        mUserFileManager = userFileManager;
 
         carServiceProvider.addListener(car -> {
             CarUserManager carUserManager = car.getCarManager(CarUserManager.class);
@@ -807,7 +813,22 @@ public class CarSystemBarController {
             }
             return;
         }
-        mDockViewController = new DockViewController(dockView, mUserTracker.getUserContext());
+        mDockViewController = createDockViewController(
+                dockView,
+                mUserTracker.getUserContext(),
+                mUserFileManager.getFile(
+                        DockProtoDataController.FILE_NAME,
+                        mUserTracker.getUserId()
+                )
+        );
+    }
+
+    protected DockViewController createDockViewController(
+            DockView dockView,
+            Context userContext,
+            File dataFile
+    ) {
+        return new DockViewController(dockView, userContext, dataFile);
     }
 
     private void destroyDock() {
