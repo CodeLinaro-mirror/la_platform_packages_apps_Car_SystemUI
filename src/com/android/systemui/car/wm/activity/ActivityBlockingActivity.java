@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.systemui.car.activity;
+package com.android.systemui.car.wm.activity;
 
 import static com.android.systemui.car.Flags.configAppBlockingActivities;
 
@@ -29,13 +29,13 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Insets;
-import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.Log;
@@ -51,11 +51,12 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.android.systemui.R;
-import com.android.systemui.car.activity.blurredbackground.BlurredSurfaceRenderer;
 import com.android.systemui.car.ndo.BlockerViewModel;
 import com.android.systemui.car.ndo.NdoViewModelFactory;
+import com.android.systemui.car.wm.activity.blurredbackground.BlurredSurfaceRenderer;
 
 import java.util.List;
+import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
 
@@ -86,6 +87,7 @@ public class ActivityBlockingActivity extends FragmentActivity {
 
     private int mBlockedTaskId;
     private final Handler mHandler = new Handler();
+    private String mBlockedActivityName;
     private final NdoViewModelFactory mViewModelFactory;
 
     private final View.OnClickListener mOnExitButtonClickedListener =
@@ -105,6 +107,13 @@ public class ActivityBlockingActivity extends FragmentActivity {
                     updateButtonWidths();
                 }
             };
+
+    private final CarPackageManager.BlockingUiCommandListener mBlockingUiCommandListener = () -> {
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Slog.d(TAG, "Finishing ABA due to task stack change");
+        }
+        finish();
+    };
 
     @Inject
     public ActivityBlockingActivity(NdoViewModelFactory viewModelFactory) {
@@ -137,6 +146,9 @@ public class ActivityBlockingActivity extends FragmentActivity {
                     // in a restricted state.
                     handleUxRChange(mUxRManager.getCurrentCarUxRestrictions());
                     mUxRManager.registerListener(ActivityBlockingActivity.this::handleUxRChange);
+                    Executor executor = new Handler(Looper.getMainLooper())::post;
+                    mCarPackageManager.registerBlockingUiCommandListener(getDisplayId(), executor,
+                            mBlockingUiCommandListener);
                 });
 
         setupGLSurface();
@@ -144,14 +156,24 @@ public class ActivityBlockingActivity extends FragmentActivity {
         if (!configAppBlockingActivities()) {
             Slog.d(TAG, "Ignoring app blocking activity feature");
         } else if (getResources().getBoolean(R.bool.config_enableAppBlockingActivities)) {
-            String blockedActivity = getIntent().getStringExtra(
+            mBlockedActivityName = getIntent().getStringExtra(
                     CarPackageManager.BLOCKING_INTENT_EXTRA_BLOCKED_ACTIVITY_NAME);
             BlockerViewModel blockerViewModel = new ViewModelProvider(this, mViewModelFactory)
                     .get(BlockerViewModel.class);
-            blockerViewModel.initialize(blockedActivity);
-            blockerViewModel.getInCallLiveData().observe(this, call -> {
-                if (call != null) {
-                    startDialerBlockingActivity();
+            int userOnDisplay = getUserForCurrentDisplay();
+            if (userOnDisplay == CarOccupantZoneManager.INVALID_USER_ID) {
+                Slog.w(TAG, "Can't find user on display " + getDisplayId()
+                        + " defaulting to current user");
+                userOnDisplay = UserHandle.USER_CURRENT;
+            }
+            blockerViewModel.initialize(mBlockedActivityName, UserHandle.of(userOnDisplay));
+            blockerViewModel.getBlockingTypeLiveData().observe(this, blockingType -> {
+                switch (blockingType) {
+                    case DIALER -> startBlockingActivity(
+                            getString(R.string.config_dialerBlockingActivity));
+                    case MEDIA -> startBlockingActivity(
+                            getString(R.string.config_mediaBlockingActivity));
+                    case NONE -> { /* no-op */ }
                 }
             });
         }
@@ -179,8 +201,9 @@ public class ActivityBlockingActivity extends FragmentActivity {
         String blockedActivity = getIntent().getStringExtra(
                 CarPackageManager.BLOCKING_INTENT_EXTRA_BLOCKED_ACTIVITY_NAME);
         if (!TextUtils.isEmpty(blockedActivity)) {
-            boolean finished = finishIfActivitiesAreDistractionOptimised();
-            if (finished) {
+            if (isTopActivityBehindAbaDistractionOptimized()) {
+                Slog.w(TAG, "Top activity is already DO, so finishing");
+                finish();
                 return;
             }
 
@@ -213,17 +236,6 @@ public class ActivityBlockingActivity extends FragmentActivity {
         finish();
     }
 
-    private boolean finishIfActivitiesAreDistractionOptimised() {
-        if (areAllVisibleActivitiesDistractionOptimised()) {
-            Slog.i(TAG, "All visible activities are already DO, so finishing");
-            finish();
-            return true;
-        }
-        mHandler.postDelayed(() -> finishIfActivitiesAreDistractionOptimised(),
-                ACTIVITY_MONITORING_DELAY_MS);
-        return false;
-    }
-
     private void setupGLSurface() {
         DisplayManager displayManager = (DisplayManager) getApplicationContext().getSystemService(
                 Context.DISPLAY_SERVICE);
@@ -239,8 +251,6 @@ public class ActivityBlockingActivity extends FragmentActivity {
         mGLSurfaceView = findViewById(R.id.blurred_surface_view);
         mGLSurfaceView.setEGLContextClientVersion(EGL_CONTEXT_VERSION);
 
-        // Sets up the surface so that we can make it translucent if needed
-        mGLSurfaceView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
         mGLSurfaceView.setEGLConfigChooser(EGL_CONFIG_SIZE, EGL_CONFIG_SIZE, EGL_CONFIG_SIZE,
                 EGL_CONFIG_SIZE, EGL_CONFIG_SIZE, EGL_CONFIG_SIZE);
 
@@ -296,40 +306,53 @@ public class ActivityBlockingActivity extends FragmentActivity {
 
     /**
      * It is possible that the stack info has changed between when the intent to launch this
-     * activity was initiated and when this activity is started. Check whether all the visible
-     * activities are distraction optimized.
+     * activity was initiated and when this activity is started. Check whether the activity behind
+     * the ABA is distraction optimized.
+     *
+     * @return {@code true} if the activity is distraction optimized, {@code false} if the top task
+     * behind the ABA is null or the top task's top activity is null or if the top activity is
+     * non-distraction optimized.
      */
-    private boolean areAllVisibleActivitiesDistractionOptimised() {
-        List<ActivityManager.RunningTaskInfo> visibleTasks;
-        visibleTasks = mCarActivityManager.getVisibleTasks();
-        for (int i = visibleTasks.size() - 1; i >= 0; i--) {
-            ActivityManager.RunningTaskInfo taskInfo = visibleTasks.get(i);
+    private boolean isTopActivityBehindAbaDistractionOptimized() {
+        List<ActivityManager.RunningTaskInfo> taskInfosTopToBottom;
+        taskInfosTopToBottom = mCarActivityManager.getVisibleTasks();
+        ActivityManager.RunningTaskInfo topStackBehindAba = null;
+
+        // Iterate in bottom to top manner
+        for (int i = taskInfosTopToBottom.size() - 1; i >= 0; i--) {
+            ActivityManager.RunningTaskInfo taskInfo = taskInfosTopToBottom.get(i);
             if (taskInfo.displayId != getDisplayId()) {
                 // ignore stacks on other displays
                 continue;
             }
 
             if (getComponentName().equals(taskInfo.topActivity)) {
-                // skip the ActivityBlockingActivity itself
-                continue;
+                // quit when stack with the blocking activity is encountered because the last seen
+                // task will be the topStackBehindAba.
+                break;
             }
 
-            if (taskInfo.topActivity != null) {
-                boolean isDo = mCarPackageManager.isActivityDistractionOptimized(
-                        taskInfo.topActivity.getPackageName(),
-                        taskInfo.topActivity.getClassName());
-                if (Log.isLoggable(TAG, Log.DEBUG)) {
-                    Slog.d(TAG,
-                            String.format("Activity (%s) is DO: %s", taskInfo.topActivity, isDo));
-                }
-                if (!isDo) {
-                    return false;
-                }
-            }
+            topStackBehindAba = taskInfo;
         }
 
-        // No visible non-DO activity found.
-        return true;
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Slog.d(TAG, String.format("Top stack behind ABA is: %s", topStackBehindAba));
+        }
+
+        if (topStackBehindAba != null && topStackBehindAba.topActivity != null) {
+            boolean isDo = mCarPackageManager.isActivityDistractionOptimized(
+                    topStackBehindAba.topActivity.getPackageName(),
+                    topStackBehindAba.topActivity.getClassName());
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Slog.d(TAG,
+                        String.format("Top activity (%s) is DO: %s", topStackBehindAba.topActivity,
+                                isDo));
+            }
+            return isDo;
+        }
+
+        // unknown top stack / activity, default to considering it non-DO
+        return false;
     }
 
     private void displayDebugInfo() {
@@ -401,6 +424,7 @@ public class ActivityBlockingActivity extends FragmentActivity {
         super.onDestroy();
         mCar.disconnect();
         mUxRManager.unregisterListener();
+        mCarPackageManager.unregisterBlockingUiCommandListener(mBlockingUiCommandListener);
         if (mToggleDebug != null) {
             mToggleDebug.getViewTreeObserver().removeOnGlobalLayoutListener(
                     mOnGlobalLayoutListener);
@@ -425,10 +449,9 @@ public class ActivityBlockingActivity extends FragmentActivity {
             return;
         }
 
-        int displayId = getDisplayId();
-        int userOnDisplay = mCarOccupantZoneManager.getUserForDisplayId(displayId);
+        int userOnDisplay = getUserForCurrentDisplay();
         if (userOnDisplay == CarOccupantZoneManager.INVALID_USER_ID) {
-            Slog.e(TAG, "can not find user on display " + displayId
+            Slog.e(TAG, "can not find user on display " + getDisplay()
                     + " to start Home");
             finish();
         }
@@ -439,7 +462,7 @@ public class ActivityBlockingActivity extends FragmentActivity {
                 CarOccupantZoneManager.DISPLAY_TYPE_MAIN);
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Slog.d(TAG, String.format("display id: %d, driver display id: %d",
-                    displayId, driverDisplayId));
+                    getDisplayId(), driverDisplayId));
         }
         startMain.addCategory(Intent.CATEGORY_HOME);
         startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -462,26 +485,29 @@ public class ActivityBlockingActivity extends FragmentActivity {
         }
     }
 
-    private void startDialerBlockingActivity() {
-        String activity = getString(R.string.config_dialerBlockingActivity);
-        Intent intent = new Intent();
-        intent.setComponent(ComponentName.unflattenFromString(activity));
-        intent.setAction(Intent.ACTION_VIEW);
-
-        // Dialer must be launched in current user(u10+) for it to start.
-        int displayId = getDisplayId();
-        int userOnDisplay = mCarOccupantZoneManager.getUserForDisplayId(displayId);
+    private void startBlockingActivity(String blockingActivity) {
+        int userOnDisplay = getUserForCurrentDisplay();
         if (userOnDisplay == CarOccupantZoneManager.INVALID_USER_ID) {
-            Slog.w(TAG, "Can't launch dialer. Can't find user on display " + displayId);
-            return;
+            Slog.w(TAG, "Can't find user on display " + getDisplayId()
+                    + " defaulting to USER_CURRENT");
+            userOnDisplay = UserHandle.USER_CURRENT;
         }
 
+        ComponentName componentName = ComponentName.unflattenFromString(blockingActivity);
+        Intent intent = new Intent();
+        intent.setComponent(componentName);
+        intent.putExtra(Intent.EXTRA_COMPONENT_NAME, mBlockedActivityName);
         try {
             startActivityAsUser(intent, UserHandle.of(userOnDisplay));
         } catch (ActivityNotFoundException ex) {
-            Slog.w(TAG, "Dialer blocking activity was not found: " + activity, ex);
+            Slog.e(TAG, "Unable to resolve blocking activity " + blockingActivity, ex);
         } catch (RuntimeException ex) {
-            Slog.w(TAG, "Failed to launch dialer blocking activity", ex);
+            Slog.w(TAG, "Failed to launch blocking activity " + blockingActivity, ex);
         }
+    }
+
+    private int getUserForCurrentDisplay() {
+        int displayId = getDisplayId();
+        return mCarOccupantZoneManager.getUserForDisplayId(displayId);
     }
 }
