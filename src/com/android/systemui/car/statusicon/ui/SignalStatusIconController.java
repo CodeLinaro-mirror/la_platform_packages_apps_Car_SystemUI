@@ -113,6 +113,12 @@ public class SignalStatusIconController extends StatusIconController implements
     }
 
     @Override
+    protected void onDestroy() {
+        mNetworkController.removeCallback(this);
+        mHotspotController.removeCallback(this);
+    }
+
+    @Override
     protected void updateStatus() {
         if (mIsHotspotEnabled) {
             setIconDrawableToDisplay(mHotSpotIconDrawable);
