@@ -21,7 +21,6 @@ import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.UserHandle;
-import android.support.v4.media.session.PlaybackStateCompat;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -76,7 +75,7 @@ public class MediaSessionHelper extends MediaController.Callback {
 
     @Override
     public void onPlaybackStateChanged(@Nullable PlaybackState state) {
-        if (state != null && state.isActive()) {
+        if (isPausedOrActive(state)) {
             onMediaSessionChange(mMediaSessionManager
                     .getActiveSessionsForUser(/* notificationListener= */ null, mUserHandle));
         }
@@ -91,7 +90,7 @@ public class MediaSessionHelper extends MediaController.Callback {
         List<MediaController> activeMediaControllers = new ArrayList<>();
 
         for (MediaController mediaController : mediaControllers) {
-            if (isPlayable(mediaController)) {
+            if (isPausedOrActive(mediaController.getPlaybackState())) {
                 activeMediaControllers.add(mediaController);
             } else {
                 // Since playback state changes don't trigger an active media session change, we
@@ -102,16 +101,12 @@ public class MediaSessionHelper extends MediaController.Callback {
         mLiveData.setValue(activeMediaControllers);
     }
 
-
-    /** Returns whether the MediaController is active or playable */
-    private boolean isPlayable(MediaController mediaController) {
-        PlaybackState playbackState = mediaController.getPlaybackState();
+    /** Returns whether the MediaController is paused active */
+    private boolean isPausedOrActive(PlaybackState playbackState) {
         if (playbackState == null) {
             return false;
         }
-
-        return playbackState.isActive()
-                || (playbackState.getActions() & PlaybackStateCompat.ACTION_PLAY) != 0;
+        return playbackState.isActive() || playbackState.getState() == PlaybackState.STATE_PAUSED;
     }
 
     private void registerForPlaybackChanges(MediaController controller) {
