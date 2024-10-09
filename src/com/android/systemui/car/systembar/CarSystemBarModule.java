@@ -29,6 +29,8 @@ import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.dagger.CarSysUIDynamicOverride;
 import com.android.systemui.car.displaycompat.ToolbarController;
 import com.android.systemui.car.hvac.HvacController;
+import com.android.systemui.car.keyguard.KeyguardSystemBarPresenter;
+import com.android.systemui.car.notification.NotificationSystemBarPresenter;
 import com.android.systemui.car.statusicon.StatusIconPanelViewController;
 import com.android.systemui.car.systembar.element.CarSystemBarElementController;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
@@ -235,4 +237,35 @@ public abstract class CarSystemBarModule {
     @ClassKey(UserNameImageViewController.class)
     public abstract CarSystemBarElementController.Factory bindUserNameImageViewController(
             UserNameImageViewController.Factory factory);
+
+    /** Injects KeyguardSystemBarPresenter */
+    @SysUISingleton
+    @Provides
+    static Optional<KeyguardSystemBarPresenter> provideKeyguardSystemBarPresenter(
+             CarSystemBarController controller) {
+        if (controller instanceof KeyguardSystemBarPresenter) {
+            return Optional.of((KeyguardSystemBarPresenter) controller);
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    /** Injects DebugPanelButtonViewController */
+    @Binds
+    @IntoMap
+    @ClassKey(DebugPanelButtonViewController.class)
+    public abstract CarSystemBarElementController.Factory bindDebugPanelButtonViewController(
+            DebugPanelButtonViewController.Factory factory);
+
+    /** Injects NotificationSystemBarPresenter */
+    @SysUISingleton
+    @Provides
+    static Optional<NotificationSystemBarPresenter> provideNotificationSystemBarPresenter(
+             CarSystemBarController controller) {
+        if (controller instanceof NotificationSystemBarPresenter) {
+            return Optional.of((NotificationSystemBarPresenter) controller);
+        } else {
+            return Optional.empty();
+        }
+    }
 }
