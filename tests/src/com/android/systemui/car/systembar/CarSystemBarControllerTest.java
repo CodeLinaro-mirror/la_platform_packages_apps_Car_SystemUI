@@ -30,10 +30,9 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assume.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +42,7 @@ import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableResources;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -64,6 +64,7 @@ import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.car.hvac.HvacPanelController;
 import com.android.systemui.car.notification.NotificationsShadeController;
 import com.android.systemui.car.statusicon.StatusIconPanelViewController;
+import com.android.systemui.car.systembar.CarSystemBarController.SystemBarSide;
 import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.plugins.DarkIconDispatcher;
@@ -85,10 +86,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoSession;
 import org.mockito.quality.Strictness;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @CarSystemUiTest
@@ -119,8 +124,6 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     @Mock
     private CameraPrivacyChipViewController mCameraPrivacyChipViewController;
     @Mock
-    private StatusIconPanelViewController.Builder mPanelControllerBuilder;
-    @Mock
     private StatusIconPanelViewController mPanelController;
     @Mock
     private LightBarController mLightBarController;
@@ -150,7 +153,8 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     private ConfigurationController mConfigurationController;
     @Mock
     private CarSystemBarRestartTracker mCarSystemBarRestartTracker;
-    RegisterStatusBarResult mRegisterStatusBarResult;
+    private RegisterStatusBarResult mRegisterStatusBarResult;
+    private SystemBarConfigs mSystemBarConfigs;
 
     @Before
     public void setUp() throws Exception {
@@ -162,16 +166,26 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources = mContext.getOrCreateTestableResources();
         mSpiedContext = spy(mContext);
         when(mSpiedContext.getSystemService(ActivityManager.class)).thenReturn(mActivityManager);
+        mSystemBarConfigs = new SystemBarConfigs(mTestableResources.getResources());
         CarSystemBarViewController.Factory carSystemBarViewControllerFactory =
                 new CarSystemBarViewController.Factory() {
-                    public CarSystemBarViewController create(CarSystemBarView view) {
-                        return new CarSystemBarViewController(mSpiedContext, mUserTracker,
-                                mock(CarSystemBarElementInitializer.class), view);
+                    public CarSystemBarViewController create(@SystemBarSide int side,
+                            CarSystemBarView view) {
+                        return spy(new CarSystemBarViewController(mSpiedContext, mUserTracker,
+                                mock(CarSystemBarElementInitializer.class), mSystemBarConfigs,
+                                mButtonRoleHolderController, mButtonSelectionStateController,
+                                () -> mCameraPrivacyChipViewController,
+                                () -> mMicPrivacyChipViewController,
+                                mHvacController, side, view));
                     }
                 };
-        mCarSystemBarViewFactory = new CarSystemBarViewFactoryImpl(mSpiedContext,
-                () -> carSystemBarViewControllerFactory);
-        setupPanelControllerBuilderMocks();
+        Map<@SystemBarSide Integer, CarSystemBarViewController.Factory> factoriesMap =
+                new HashMap<>();
+        factoriesMap.put(LEFT, carSystemBarViewControllerFactory);
+        factoriesMap.put(TOP, carSystemBarViewControllerFactory);
+        factoriesMap.put(RIGHT, carSystemBarViewControllerFactory);
+        factoriesMap.put(BOTTOM, carSystemBarViewControllerFactory);
+        mCarSystemBarViewFactory = new CarSystemBarViewFactoryImpl(mSpiedContext, factoriesMap);
 
         mRegisterStatusBarResult = new RegisterStatusBarResult(new ArrayMap<>(), 0, 0,
                 new AppearanceRegion[0], 0, 0, false, 0, false, 0, 0, "", 0,
@@ -193,19 +207,13 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     }
 
     private void initCarSystemBar() {
-        SystemBarConfigs systemBarConfigs = new SystemBarConfigs(mTestableResources.getResources());
         FakeDisplayTracker displayTracker = new FakeDisplayTracker(mContext);
         FakeExecutor executor = new FakeExecutor(new FakeSystemClock());
 
         mCarSystemBarController = new CarSystemBarControllerImpl(mSpiedContext,
                 mUserTracker,
                 mCarSystemBarViewFactory,
-                mButtonSelectionStateController,
-                () -> mMicPrivacyChipViewController,
-                () -> mCameraPrivacyChipViewController,
-                mButtonRoleHolderController,
-                systemBarConfigs,
-                () -> mPanelControllerBuilder,
+                mSystemBarConfigs,
                 mLightBarController,
                 mStatusBarIconController,
                 mWindowManager,
@@ -217,39 +225,10 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
                 mBarService,
                 () -> mKeyguardStateController,
                 () -> mIconPolicy,
-                mHvacController,
                 mConfigurationController,
                 mCarSystemBarRestartTracker,
                 displayTracker,
                 null);
-    }
-
-    @Test
-    public void testRemoveAll_callsButtonRoleHolderControllerRemoveAll() {
-        mCarSystemBarController.init();
-
-        mCarSystemBarController.removeAll();
-
-        verify(mButtonRoleHolderController).removeAll();
-    }
-
-    @Test
-    public void testRemoveAll_callsButtonSelectionStateControllerRemoveAll() {
-        mCarSystemBarController.init();
-
-        mCarSystemBarController.removeAll();
-
-        verify(mButtonSelectionStateController).removeAll();
-    }
-
-    @Test
-    public void testRemoveAll_callsPrivacyChipViewControllerRemoveAll() {
-        mCarSystemBarController.init();
-
-        mCarSystemBarController.removeAll();
-
-        verify(mMicPrivacyChipViewController).removeAll();
-        verify(mCameraPrivacyChipViewController).removeAll();
     }
 
     @Test
@@ -482,16 +461,18 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
-        Set<View.OnTouchListener> controllers = bottomBar.getStatusBarWindowTouchListeners();
-        assertThat(controllers).isNotNull();
-        assertThat(controllers.size()).isEqualTo(0);
-        mCarSystemBarController.registerBarTouchListener(BOTTOM, mock(View.OnTouchListener.class));
-        controllers = bottomBar.getStatusBarWindowTouchListeners();
+        View.OnTouchListener mockOnTouchListener = mock(View.OnTouchListener.class);
+        Set<View.OnTouchListener> listeners = new ArraySet<>();
+        listeners.add(mockOnTouchListener);
+        mCarSystemBarController.registerBarTouchListener(BOTTOM, mockOnTouchListener);
 
-        assertThat(controllers).isNotNull();
-        assertThat(controllers.size()).isEqualTo(1);
+        ArgumentCaptor<Set<View.OnTouchListener>> captor = ArgumentCaptor.forClass(Set.class);
+        verify(bottomBar, times(2)).setStatusBarWindowTouchListeners(captor.capture());
+
+        List<Set<View.OnTouchListener>> allValues = captor.getAllValues();
+        assertThat(allValues.contains(listeners));
     }
 
     @Test
@@ -499,13 +480,18 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
-        mCarSystemBarController.registerBarTouchListener(BOTTOM, mock(View.OnTouchListener.class));
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        View.OnTouchListener mockOnTouchListener = mock(View.OnTouchListener.class);
+        Set<View.OnTouchListener> listeners = new ArraySet<>();
+        listeners.add(mockOnTouchListener);
+        mCarSystemBarController.registerBarTouchListener(BOTTOM, mockOnTouchListener);
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
-        Set<View.OnTouchListener> controllers = bottomBar.getStatusBarWindowTouchListeners();
 
-        assertThat(controllers).isNotNull();
-        assertThat(controllers.size()).isEqualTo(1);
+        ArgumentCaptor<Set<View.OnTouchListener>> captor = ArgumentCaptor.forClass(Set.class);
+        verify(bottomBar, times(1)).setStatusBarWindowTouchListeners(captor.capture());
+
+        List<Set<View.OnTouchListener>> allValues = captor.getAllValues();
+        assertThat(allValues.contains(listeners));
     }
 
     @Test
@@ -513,16 +499,21 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
-        NotificationsShadeController controller =
-                bottomBar.getNotificationsPanelController();
-        assertThat(controller).isNull();
-        mCarSystemBarController.registerNotificationShadeController(
-                mock(NotificationsShadeController.class));
-        controller = bottomBar.getNotificationsPanelController();
 
-        assertThat(controller).isNotNull();
+        NotificationsShadeController mockNotificationsShadeController =
+                mock(NotificationsShadeController.class);
+        mCarSystemBarController.registerNotificationShadeController(
+                mockNotificationsShadeController);
+
+        ArgumentCaptor<NotificationsShadeController> captor =
+                ArgumentCaptor.forClass(NotificationsShadeController.class);
+        verify(bottomBar, times(2)).setNotificationsPanelController(captor.capture());
+
+        List<NotificationsShadeController> allValues = captor.getAllValues();
+        assertThat(allValues.contains(null));
+        assertThat(allValues.contains(mockNotificationsShadeController));
     }
 
     @Test
@@ -530,14 +521,20 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
+        NotificationsShadeController mockNotificationsShadeController =
+                mock(NotificationsShadeController.class);
         mCarSystemBarController.registerNotificationShadeController(
-                mock(NotificationsShadeController.class));
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+                mockNotificationsShadeController);
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
-        NotificationsShadeController controller =
-                bottomBar.getNotificationsPanelController();
 
-        assertThat(controller).isNotNull();
+
+        ArgumentCaptor<NotificationsShadeController> captor =
+                ArgumentCaptor.forClass(NotificationsShadeController.class);
+        verify(bottomBar, times(1)).setNotificationsPanelController(captor.capture());
+
+        List<NotificationsShadeController> allValues = captor.getAllValues();
+        assertThat(allValues.contains(mockNotificationsShadeController));
     }
 
     @Test
@@ -545,15 +542,21 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
-        HvacPanelController controller = bottomBar.getHvacPanelController();
-        assertThat(controller).isNull();
-        mCarSystemBarController.registerHvacPanelController(
-                mock(HvacPanelController.class));
-        controller = bottomBar.getHvacPanelController();
 
-        assertThat(controller).isNotNull();
+        HvacPanelController mockHvacPanelController =
+                mock(HvacPanelController.class);
+        mCarSystemBarController.registerHvacPanelController(
+                mockHvacPanelController);
+
+        ArgumentCaptor<HvacPanelController> captor =
+                ArgumentCaptor.forClass(HvacPanelController.class);
+        verify(bottomBar, times(2)).setHvacPanelController(captor.capture());
+
+        List<HvacPanelController> allValues = captor.getAllValues();
+        assertThat(allValues.contains(null));
+        assertThat(allValues.contains(mockHvacPanelController));
     }
 
     @Test
@@ -561,20 +564,27 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
+        HvacPanelController mockHvacPanelController =
+                mock(HvacPanelController.class);
         mCarSystemBarController.registerHvacPanelController(
-                mock(HvacPanelController.class));
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
-                /* isSetUp= */ true);
-        HvacPanelController controller = bottomBar.getHvacPanelController();
+                mockHvacPanelController);
 
-        assertThat(controller).isNotNull();
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
+                /* isSetUp= */ true);
+
+        ArgumentCaptor<HvacPanelController> captor =
+                ArgumentCaptor.forClass(HvacPanelController.class);
+        verify(bottomBar, times(1)).setHvacPanelController(captor.capture());
+
+        List<HvacPanelController> allValues = captor.getAllValues();
+        assertThat(allValues.contains(mockHvacPanelController));
     }
 
     @Test
     public void testShowAllNavigationButtons_bottomEnabled_bottomNavigationButtonsVisible() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View bottomNavButtons = bottomBar.getView().findViewById(R.id.nav_buttons);
 
@@ -587,7 +597,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowAllNavigationButtons_bottomEnabled_bottomKeyguardButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View bottomKeyguardButtons = bottomBar.getView().findViewById(R.id.lock_screen_nav_buttons);
 
@@ -600,7 +610,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowAllNavigationButtons_bottomEnabled_bottomOcclusionButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View occlusionButtons = bottomBar.getView().findViewById(R.id.occlusion_buttons);
 
@@ -613,7 +623,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowAllKeyguardButtons_bottomEnabled_bottomKeyguardButtonsVisible() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View bottomKeyguardButtons = bottomBar.getView().findViewById(R.id.lock_screen_nav_buttons);
 
@@ -626,7 +636,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowAllKeyguardButtons_bottomEnabled_bottomNavigationButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View bottomNavButtons = bottomBar.getView().findViewById(R.id.nav_buttons);
 
@@ -639,7 +649,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowAllKeyguardButtons_bottomEnabled_bottomOcclusionButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View occlusionButtons = bottomBar.getView().findViewById(R.id.occlusion_buttons);
 
@@ -652,7 +662,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowOcclusionButtons_bottomEnabled_bottomOcclusionButtonsVisible() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View occlusionButtons = bottomBar.getView().findViewById(R.id.occlusion_buttons);
 
@@ -665,7 +675,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowOcclusionButtons_bottomEnabled_bottomNavigationButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View bottomNavButtons = bottomBar.getView().findViewById(R.id.nav_buttons);
 
@@ -678,7 +688,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testShowOcclusionButtons_bottomEnabled_bottomKeyguardButtonsGone() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View keyguardButtons = bottomBar.getView().findViewById(R.id.lock_screen_nav_buttons);
 
@@ -739,7 +749,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testRefreshSystemBar_homeDisabled() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         clearSystemBarStates();
         CarSystemBarButton button = bottomBar.getView().findViewById(R.id.home);
@@ -756,7 +766,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
 
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         clearSystemBarStates();
         CarSystemBarButton button = bottomBar.getView().findViewById(R.id.phone_nav);
@@ -771,7 +781,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     public void testRefreshSystemBar_appGridisabled() {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         clearSystemBarStates();
         CarSystemBarButton button = bottomBar.getView().findViewById(R.id.grid_nav);
@@ -814,7 +824,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, /* value= */ true);
         mCarSystemBarController.init();
 
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View driverHomeButton = bottomBar.getView().findViewById(R.id.home);
         View passengerHomeButton = bottomBar.getView().findViewById(R.id.passenger_home);
@@ -830,7 +840,7 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
         mCarSystemBarController.init();
 
-        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
+        CarSystemBarViewController bottomBar = mCarSystemBarController.getBarViewController(BOTTOM,
                 /* isSetUp= */ true);
         View driverHomeButton = bottomBar.getView().findViewById(R.id.home);
         View passengerHomeButton = bottomBar.getView().findViewById(R.id.passenger_home);
@@ -853,17 +863,6 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         mCarSystemBarController.setSystemBarStates(/* state= */ 0, /* state2= */ 0);
     }
 
-    private void setupPanelControllerBuilderMocks() {
-        when(mPanelControllerBuilder.setXOffset(anyInt())).thenReturn(mPanelControllerBuilder);
-        when(mPanelControllerBuilder.setYOffset(anyInt())).thenReturn(mPanelControllerBuilder);
-        when(mPanelControllerBuilder.setGravity(anyInt())).thenReturn(mPanelControllerBuilder);
-        when(mPanelControllerBuilder.setDisabledWhileDriving(anyBoolean())).thenReturn(
-                mPanelControllerBuilder);
-        when(mPanelControllerBuilder.setShowAsDropDown(anyBoolean())).thenReturn(
-                mPanelControllerBuilder);
-        when(mPanelControllerBuilder.build(any(), anyInt(), anyInt())).thenReturn(mPanelController);
-    }
-
     private void enableSystemBarWithNotificationButton() {
         if (Flags.dockFeature()) {
             mTestableResources.addOverride(R.bool.config_enableTopSystemBar, true);
@@ -874,12 +873,12 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
 
     private CarSystemBarButton getNotificationCarSystemBarButton() {
         if (Flags.dockFeature()) {
-            CarSystemBarViewController topBar = mCarSystemBarController.getBarView(TOP,
-                    /* isSetUp= */ true);
+            CarSystemBarViewController topBar = mCarSystemBarController
+                    .getBarViewController(TOP, /* isSetUp= */ true);
             return topBar.getView().findViewById(R.id.notifications);
         } else {
-            CarSystemBarViewController bottomBar = mCarSystemBarController.getBarView(BOTTOM,
-                    /* isSetUp= */ true);
+            CarSystemBarViewController bottomBar = mCarSystemBarController
+                    .getBarViewController(BOTTOM, /* isSetUp= */ true);
             return bottomBar.getView().findViewById(R.id.notifications);
         }
     }
