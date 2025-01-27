@@ -79,6 +79,7 @@ java_defaults {
         "CarDockLib",
         "androidx.test.rules",
         "car-data-subscription-lib",
+        "Car-WindowManager-Shell",
     ],
 
     libs: [
@@ -223,6 +224,7 @@ android_library {
         "car-data-subscription-lib",
         "testng",
         "//external/kotlinc:kotlin-annotations",
+        "Car-WindowManager-Shell",
     ],
 }
 
@@ -239,6 +241,9 @@ android_library {
         "src/**/I*.aidl",
         ":statslog-carsystemui-java-gen",
     ],
+
+    kotlin_lang_version: "1.9",
+
     static_libs: [
         "SystemUI-tests",
         "CarSystemUI-tests-base",
