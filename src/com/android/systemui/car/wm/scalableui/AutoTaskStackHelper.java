@@ -16,93 +16,121 @@
 
 package com.android.systemui.car.wm.scalableui;
 
-import android.animation.Animator;
-import android.annotation.NonNull;
 import android.app.ActivityManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.util.Log;
 import android.window.WindowContainerTransaction;
 
-import com.android.car.scalableui.manager.PanelTransaction;
-import com.android.car.scalableui.model.Transition;
-import com.android.car.scalableui.model.Variant;
-import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
-import com.android.systemui.car.wm.scalableui.panel.TaskPanelPool;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.android.systemui.R;
 import com.android.wm.shell.ShellTaskOrganizer;
-import com.android.wm.shell.automotive.AutoTaskStackController;
-import com.android.wm.shell.automotive.AutoTaskStackState;
-import com.android.wm.shell.automotive.AutoTaskStackTransaction;
 import com.android.wm.shell.dagger.WMSingleton;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Inject;
 
 @WMSingleton
 public final class AutoTaskStackHelper {
+    private static final String TAG = AutoTaskStackHelper.class.getSimpleName();
+    private static final String DELIMITER = ";";
     private final ShellTaskOrganizer mShellTaskOrganizer;
-    private final AutoTaskStackController mAutoTaskStackController;
-    private final HashMap<String, Animator> mPendingAnimators = new HashMap<>();
+    private final Context mContext;
+    private final Set<ComponentName> mNonTrimmableComponentSet;
+    private final Map<String, ComponentName> mDefaultComponentsMap;
 
     @Inject
-    public AutoTaskStackHelper(ShellTaskOrganizer shellTaskOrganizer,
-            AutoTaskStackController autoTaskStackController) {
+    public AutoTaskStackHelper(Context context, ShellTaskOrganizer shellTaskOrganizer) {
         mShellTaskOrganizer = shellTaskOrganizer;
-        mAutoTaskStackController = autoTaskStackController;
+        mContext = context;
+        mNonTrimmableComponentSet = new HashSet<>();
+        mDefaultComponentsMap = new HashMap<>();
+        initUntrimmableTaskSet();
+        initDefaultTaskMap();
+    }
+
+    /**
+     * Checks if a given running task is trimmable.
+     *
+     * <p> A task is trimmable if it's configured in config_untrimmable_activities
+     */
+    private boolean isTrimmable(@NonNull ActivityManager.RunningTaskInfo task) {
+        return !mNonTrimmableComponentSet.contains(task.baseActivity);
     }
 
     /**
      * Sets a task as trimmable or not - by default this will be true for tasks.
      */
-    public void setTaskTrimmable(@NonNull ActivityManager.RunningTaskInfo task, boolean trimmable) {
+    private void setTaskTrimmable(@NonNull ActivityManager.RunningTaskInfo task,
+            boolean trimmable) {
         WindowContainerTransaction wct = new WindowContainerTransaction();
         wct.setTaskTrimmableFromRecents(task.token, trimmable);
         mShellTaskOrganizer.applyTransaction(wct);
     }
 
     /**
-     * Start a new transition for a given {@link PanelTransaction}
+     * Retrieves the default {@link ComponentName} associated with a given ID.
+     *
+     * <p> The relationship is defined in config_default_activities.
      */
-    public void startTransition(PanelTransaction transaction) {
-        mAutoTaskStackController.startTransition(getAutoTaskStackTransaction(transaction));
+    @Nullable
+    public ComponentName getDefaultIntent(String id) {
+        return mDefaultComponentsMap.get(id);
     }
 
     /**
-     * Get a AutoTaskStackTransaction for a given PanelTransaction and set the appropriate
-     * pending animators.
+     * Initializes the default task map from the config_default_activities array.
+     *
+     * <p> The format of the array is as follows:
+     * 1. panel_id;componentname
+     * 2. panel_id;com.example.app/.activity
      */
-    public AutoTaskStackTransaction getAutoTaskStackTransaction(
-            PanelTransaction panelTransaction) {
-        mPendingAnimators.clear();
-        AutoTaskStackTransaction autoTaskStackTransaction = new AutoTaskStackTransaction();
-
-        for (Map.Entry<String, Transition> entry :
-                panelTransaction.getPanelTransactionStates()) {
-            Transition transition = entry.getValue();
-            Variant toVariant = transition.getToVariant();
-            TaskPanel taskPanel = TaskPanelPool.getTaskPanel(
-                    p -> p.getRootStack() != null && p.getId().equals(entry.getKey()));
-            if (taskPanel == null) {
-                continue;
+    private void initDefaultTaskMap() {
+        String[] configStrings = mContext.getResources().getStringArray(
+                R.array.config_default_activities);
+        for (int i = configStrings.length - 1; i >= 0; i--) {
+            String[] parts = configStrings[i].split(DELIMITER);
+            if (parts.length == 2) {
+                String key = parts[0].trim(); // Trim whitespace
+                String value = parts[1].trim(); // Trim whitespace
+                mDefaultComponentsMap.put(key, ComponentName.unflattenFromString(value));
+            } else {
+                // Handle cases where the split doesn't result in two parts (e.g., malformed input)
+                Log.e(TAG, "Skipping malformed pair: " + configStrings[i]);
+                // You could choose to throw an exception here, or just continue.
             }
-            AutoTaskStackState autoTaskStackState = new AutoTaskStackState(
-                    toVariant.getBounds(),
-                    toVariant.isVisible(),
-                    toVariant.getLayer());
-            autoTaskStackTransaction.setTaskStackState(taskPanel.getRootStack().getId(),
-                    autoTaskStackState);
         }
-        for (Map.Entry<String, Animator> entry : panelTransaction.getAnimators()) {
-            //TODO(b/391726254): use a HashMap from IBinder to PanelTransaction.
-            mPendingAnimators.put(entry.getKey(), entry.getValue());
-        }
-
-        return autoTaskStackTransaction;
     }
 
     /**
-     * Retrieve the pending animators setup in {@link #getAutoTaskStackTransaction}.
+     * Initializes the {@code mNonTrimmableComponentSet} tasks from the
+     * config_untrimmable_activities string array resource.
      */
-    public Map<String, Animator> getPendingAnimators() {
-        return mPendingAnimators;
+    private void initUntrimmableTaskSet() {
+        String[] componentNameStrings = mContext.getResources().getStringArray(
+                R.array.config_untrimmable_activities);
+        for (int i = componentNameStrings.length - 1; i >= 0; i--) {
+            mNonTrimmableComponentSet.add(
+                    ComponentName.unflattenFromString(componentNameStrings[i]));
+        }
+    }
+
+    /**
+     * Sets the given task as untrimmable if it is not already trimmable.
+     *
+     * <p>This method checks if the provided {@link ActivityManager.RunningTaskInfo}
+     * is considered according to config_untrimmable_activities. If the task is *not*
+     * trimmable, it explicitly sets the task's trimmable state to `false`.
+     */
+    public void setTaskUntrimmableIfNeeded(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
+        if (!isTrimmable(taskInfo)) {
+            setTaskTrimmable(taskInfo, /* trimmable= */ false);
+        }
     }
 }
