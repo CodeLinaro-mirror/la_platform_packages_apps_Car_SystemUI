@@ -51,7 +51,6 @@ import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel;
 import com.android.systemui.car.CarSystemUiTest;
 import com.android.systemui.car.window.OverlayViewGlobalStateController;
 import com.android.systemui.car.window.SystemUIOverlayWindowController;
-import com.android.systemui.keyguard.ui.viewmodel.GlanceableHubToPrimaryBouncerTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.log.BouncerLogger;
 import com.android.systemui.settings.UserTracker;
@@ -106,9 +105,6 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
     @Mock
     private PrimaryBouncerToGoneTransitionViewModel mPrimaryBouncerToGoneTransitionViewModel;
     @Mock
-    private GlanceableHubToPrimaryBouncerTransitionViewModel
-            mGlanceableHubToPrimaryBouncerTransitionViewModel;
-    @Mock
     private BouncerView mBouncerView;
     @Mock
     private KeyguardSystemBarPresenter mKeyguardSystemBarPresenter;
@@ -147,7 +143,6 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
                 mKeyguardSecurityModel,
                 mKeyguardBouncerViewModel,
                 mPrimaryBouncerToGoneTransitionViewModel,
-                mGlanceableHubToPrimaryBouncerTransitionViewModel,
                 mKeyguardBouncerComponentFactory,
                 mBouncerView,
                 mock(KeyguardMessageAreaController.Factory.class),

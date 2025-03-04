@@ -59,14 +59,12 @@ public class BackgroundAdjustingTemperatureControlView extends TemperatureContro
         TypedArray colorRes = res.obtainTypedArray(R.array.hvac_temperature_level_backgrounds);
         mTempColors = new int[colorRes.length()];
         for (int i = 0; i < colorRes.length(); i++) {
-            int color = res.getColor(colorRes.getResourceId(i,
-                    R.color.hvac_temperature_default_bg_color), getContext().getTheme());
-            mTempColors[i] = color;
+            mTempColors[i] = colorRes.getColor(i,
+                    res.getColor(R.color.hvac_temperature_default_bg_color,
+                            getContext().getTheme()));
         }
         colorRes.recycle();
-
-        mOffColor = res.getColor(R.color.hvac_temperature_off_text_bg_color,
-                getContext().getTheme());
+        mOffColor = res.getColor(R.color.hvac_temperature_off_text_bg_color, /* theme= */ null);
         // call super.onFinishInflate() last since it may trigger other methods like
         // updateTemperatureViewUiThread() which can't execute prior to these fixtures being set
         super.onFinishInflate();

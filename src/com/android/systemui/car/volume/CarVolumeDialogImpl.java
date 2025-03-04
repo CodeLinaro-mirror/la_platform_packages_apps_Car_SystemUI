@@ -614,8 +614,7 @@ public class CarVolumeDialogImpl
                         mCarAudioManager));
         carVolumeItem.setGroupId(volumeGroupId);
 
-        int color = mContext.getResources().getColor(R.color.car_volume_dialog_tint,
-                mContext.getTheme());
+        int color = mContext.getColor(R.color.car_volume_dialog_tint);
         Drawable primaryIcon = mContext.getDrawable(volumeItem.mIcon);
         primaryIcon.mutate().setTint(color);
         carVolumeItem.setPrimaryIcon(primaryIcon);

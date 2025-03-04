@@ -43,8 +43,7 @@ public class CarKeyguardPINView extends KeyguardPINView {
     public CarKeyguardPINView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
-        mButtonImageColor = context.getResources().getColor(R.color.keyguard_keypad_image_color,
-                context.getTheme());
+        mButtonImageColor = context.getColor(R.color.keyguard_keypad_image_color);
     }
 
     @Override

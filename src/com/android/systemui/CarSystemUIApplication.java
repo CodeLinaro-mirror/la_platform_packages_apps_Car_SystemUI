@@ -20,10 +20,8 @@ import static android.car.CarOccupantZoneManager.DISPLAY_TYPE_MAIN;
 
 import android.car.Car;
 import android.car.CarOccupantZoneManager;
-import android.content.Context;
 import android.view.Display;
 
-import com.android.car.oem.tokens.Token;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 
 /**
@@ -77,12 +75,5 @@ public class CarSystemUIApplication extends SystemUIApplication {
             return false;
         }
         return super.shouldStartSecondaryUserServices();
-    }
-
-    @Override
-    public void attachBaseContext(Context base) {
-        Context context = Token.createOemStyledContext(base);
-        context.getTheme().applyStyle(R.style.CarSystemUIThemeOverlay, true);
-        super.attachBaseContext(context);
     }
 }

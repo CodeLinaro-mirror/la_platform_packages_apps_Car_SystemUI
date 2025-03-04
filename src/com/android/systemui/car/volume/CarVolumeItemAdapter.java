@@ -50,10 +50,8 @@ public class CarVolumeItemAdapter extends
     @Override
     public void onBindViewHolder(CarVolumeItem.CarVolumeItemViewHolder holder, int position) {
         mItems.get(position).bind(holder);
-        int backgroundColor = mContext.getResources().getColor(
-                R.color.car_volume_dialog_background_color, mContext.getTheme());
-        int iconColor = mContext.getResources().getColor(
-                R.color.car_volume_dialog_tint, mContext.getTheme());
+        int backgroundColor = mContext.getColor(R.color.car_volume_dialog_background_color);
+        int iconColor = mContext.getColor(R.color.car_volume_dialog_tint);
         holder.itemView.setBackgroundColor(backgroundColor);
         holder.setIconDrawableColor(iconColor);
     }

@@ -53,9 +53,7 @@ final class SnackbarManager {
             mAnchorViewId = anchorViewId;
         }
         mDisplayId = context.getDisplayId();
-        mSnackbarBackgroundTint = context.getResources().getColor(
-                R.color.user_picker_snack_bar_background_color,
-                context.getTheme());
+        mSnackbarBackgroundTint = context.getColor(R.color.user_picker_snack_bar_background_color);
     }
 
     void showSnackbar(@NonNull String message) {
