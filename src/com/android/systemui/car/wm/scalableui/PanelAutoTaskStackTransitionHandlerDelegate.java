@@ -16,6 +16,7 @@
 package com.android.systemui.car.wm.scalableui;
 
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 
 import static com.android.systemui.car.Flags.scalableUi;
 
@@ -169,6 +170,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
                 pos = change.getStartAbsBounds();
             }
             transaction.setPosition(leash, pos.left, pos.top);
+            transaction.setCornerRadius(leash, taskPanel.getCornerRadius());
             taskPanel.setLeash(leash);
 
             transaction.setLayer(leash, taskPanel.getLayer());
@@ -184,6 +186,14 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
                 && request.getTriggerTask().baseIntent.getCategories().contains(
                 Intent.CATEGORY_HOME)) {
             return new Event("_System_OnHomeEvent");
+        }
+
+        if ((request.getFlags() & TRANSIT_FLAG_AVOID_MOVE_TO_FRONT)
+                == TRANSIT_FLAG_AVOID_MOVE_TO_FRONT) {
+            if (DEBUG) {
+                Log.d(TAG, "Launching activity to the background, no panel action needed.");
+            }
+            return EMPTY_EVENT;
         }
 
         ComponentName component;
