@@ -36,6 +36,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
 import android.testing.TestableResources;
@@ -47,15 +49,14 @@ import android.view.WindowManager;
 
 import androidx.test.filters.SmallTest;
 
-import com.android.car.dockutil.Flags;
 import com.android.car.ui.FocusParkingView;
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.statusbar.LetterboxDetails;
 import com.android.internal.statusbar.RegisterStatusBarResult;
 import com.android.internal.view.AppearanceRegion;
+import com.android.systemui.CarSysuiTestCase;
 import com.android.systemui.R;
-import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarSystemUiTest;
@@ -102,7 +103,7 @@ import javax.inject.Provider;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 @SmallTest
-public class CarSystemBarControllerTest extends SysuiTestCase {
+public class CarSystemBarControllerTest extends CarSysuiTestCase {
     private static final String TOP_NOTIFICATION_PANEL =
             "com.android.systemui.car.notification.TopNotificationPanelViewMediator";
     private static final String BOTTOM_NOTIFICATION_PANEL =
@@ -157,6 +158,8 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
     private OverlayVisibilityMediator mOverlayVisibilityMediator;
     private RegisterStatusBarResult mRegisterStatusBarResult;
     private SystemBarConfigs mSystemBarConfigs;
+    private HandlerThread mThread;
+    private Handler mHandler;
 
     @Before
     public void setUp() throws Exception {
@@ -201,6 +204,9 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
                 new CarSystemBarElementInitializer(controllerFactoryMap);
         mSystemBarConfigs =
                 new SystemBarConfigsImpl(mSpiedContext, mTestableResources.getResources());
+        mThread = new HandlerThread("TestThread");
+        mThread.start();
+        mHandler = Handler.createAsync(mThread.getLooper());
         CarSystemBarViewControllerFactory carSystemBarViewControllerFactory =
                 new CarSystemBarViewControllerImpl.Factory() {
                     public CarSystemBarViewControllerImpl create(@SystemBarSide int side,
@@ -239,6 +245,9 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
         if (mSession != null) {
             mSession.finishMocking();
         }
+        if (mThread != null) {
+            mThread.quit();
+        }
     }
 
     private void initCarSystemBar() {
@@ -263,7 +272,8 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
                 mConfigurationController,
                 mCarSystemBarRestartTracker,
                 displayTracker,
-                null);
+                null,
+                mHandler);
     }
 
     @Test
@@ -729,13 +739,5 @@ public class CarSystemBarControllerTest extends SysuiTestCase {
                 ? ActivityManager.LOCK_TASK_MODE_LOCKED
                 : ActivityManager.LOCK_TASK_MODE_NONE);
         mCarSystemBarController.setSystemBarStates(/* state= */ 0, /* state2= */ 0);
-    }
-
-    private void enableSystemBarWithNotificationButton() {
-        if (Flags.dockFeature()) {
-            mTestableResources.addOverride(R.bool.config_enableTopSystemBar, true);
-        } else {
-            mTestableResources.addOverride(R.bool.config_enableBottomSystemBar, true);
-        }
     }
 }

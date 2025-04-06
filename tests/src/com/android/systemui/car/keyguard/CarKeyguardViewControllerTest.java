@@ -41,8 +41,8 @@ import com.android.keyguard.KeyguardSecurityModel;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.ViewMediatorCallback;
 import com.android.keyguard.dagger.KeyguardBouncerComponent;
+import com.android.systemui.CarSysuiTestCase;
 import com.android.systemui.R;
-import com.android.systemui.SysuiTestCase;
 import com.android.systemui.bouncer.domain.interactor.BouncerMessageInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerCallbackInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
@@ -51,6 +51,7 @@ import com.android.systemui.bouncer.ui.viewmodel.KeyguardBouncerViewModel;
 import com.android.systemui.car.CarSystemUiTest;
 import com.android.systemui.car.window.OverlayViewGlobalStateController;
 import com.android.systemui.car.window.SystemUIOverlayWindowController;
+import com.android.systemui.keyguard.ui.viewmodel.GlanceableHubToPrimaryBouncerTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.log.BouncerLogger;
 import com.android.systemui.settings.UserTracker;
@@ -77,7 +78,7 @@ import java.util.Optional;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper(setAsMainLooper = true)
 @SmallTest
-public class CarKeyguardViewControllerTest extends SysuiTestCase {
+public class CarKeyguardViewControllerTest extends CarSysuiTestCase {
 
     private CarKeyguardViewController mCarKeyguardViewController;
     private FakeExecutor mExecutor;
@@ -104,6 +105,9 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
     private KeyguardBouncerComponent.Factory mKeyguardBouncerComponentFactory;
     @Mock
     private PrimaryBouncerToGoneTransitionViewModel mPrimaryBouncerToGoneTransitionViewModel;
+    @Mock
+    private GlanceableHubToPrimaryBouncerTransitionViewModel
+            mGlanceableHubToPrimaryBouncerTransitionViewModel;
     @Mock
     private BouncerView mBouncerView;
     @Mock
@@ -143,6 +147,7 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
                 mKeyguardSecurityModel,
                 mKeyguardBouncerViewModel,
                 mPrimaryBouncerToGoneTransitionViewModel,
+                mGlanceableHubToPrimaryBouncerTransitionViewModel,
                 mKeyguardBouncerComponentFactory,
                 mBouncerView,
                 mock(KeyguardMessageAreaController.Factory.class),
@@ -163,7 +168,8 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
         mCarKeyguardViewController.show(/* options= */ null);
         waitForDelayableExecutor();
 
-        verify(mPrimaryBouncerInteractor).show(/* isScrimmed= */ true);
+        verify(mPrimaryBouncerInteractor).show(/* isScrimmed= */ true,
+                "CarKeyguardViewController#resetBouncer");
     }
 
     @Test
@@ -241,7 +247,8 @@ public class CarKeyguardViewControllerTest extends SysuiTestCase {
         mCarKeyguardViewController.setOccluded(/* occluded= */ false, /* animate= */ false);
         waitForDelayableExecutor();
 
-        verify(mPrimaryBouncerInteractor).show(/* isScrimmed= */ true);
+        verify(mPrimaryBouncerInteractor).show(/* isScrimmed= */ true,
+                "CarKeyguardViewController#resetBouncer");
     }
 
     @Test

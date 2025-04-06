@@ -17,7 +17,6 @@ package com.android.systemui.car.systembar;
 
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 
-import static com.android.car.dockutil.Flags.dockFeature;
 import static com.android.systemui.car.Flags.displayCompatibilityV2;
 import static com.android.systemui.car.systembar.CarSystemBarController.BOTTOM;
 import static com.android.systemui.car.systembar.CarSystemBarController.LEFT;
@@ -40,7 +39,6 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 
-import com.android.car.dockutil.Flags;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.R;
 import com.android.systemui.car.notification.BottomNotificationPanelViewMediator;
@@ -143,6 +141,14 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     }
 
     @Override
+    public void resetSystemBarWindowContext() {
+        for (int windowType : mWindowContexts.keySet()) {
+            Context context = mContext.createWindowContext(windowType, /* options= */ null);
+            mWindowContexts.put(windowType, context);
+        }
+    }
+
+    @Override
     public Context getWindowContextBySide(@SystemBarSide int side) {
         SystemBarConfig config = mSystemBarConfigMap.get(side);
         if (config == null) {
@@ -181,8 +187,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
             case TOP:
                 if (!isSetUp) {
                     return R.layout.car_top_system_bar_unprovisioned;
-                } else if (Flags.dockFeature()) {
-                    return R.layout.car_top_system_bar_dock;
                 } else {
                     return R.layout.car_top_system_bar;
                 }
@@ -195,8 +199,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
             case BOTTOM:
                 if (!isSetUp) {
                     return R.layout.car_bottom_system_bar_unprovisioned;
-                } else if (Flags.dockFeature()) {
-                    return R.layout.car_bottom_system_bar_dock;
                 } else {
                     return R.layout.car_bottom_system_bar;
                 }
@@ -426,14 +428,14 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         mLeftNavBarEnabled = mResources.getBoolean(R.bool.config_enableLeftSystemBar);
         mRightNavBarEnabled = mResources.getBoolean(R.bool.config_enableRightSystemBar);
         mDisplayCompatToolbarState =
-            mResources.getInteger(R.integer.config_showDisplayCompatToolbarOnSystemBar);
+                mResources.getInteger(R.integer.config_showDisplayCompatToolbarOnSystemBar);
         mSystemBarConfigMap.clear();
 
         if ((mLeftNavBarEnabled && isLeftDisplayCompatToolbarEnabled())
                 || (mRightNavBarEnabled && isRightDisplayCompatToolbarEnabled())) {
             throw new IllegalStateException(
-                "Navigation Bar and Display Compat toolbar can't be "
-                    + "on the same side");
+                    "Navigation Bar and Display Compat toolbar can't be "
+                            + "on the same side");
         }
 
         if (mTopNavBarEnabled) {
@@ -713,7 +715,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                             | WindowManager.LayoutParams.FLAG_SPLIT_TOUCH,
                     PixelFormat.TRANSLUCENT);
             lp.setTitle(BAR_TITLE_MAP.get(mSide));
-            lp.providedInsets = new InsetsFrameProvider[] {
+            lp.providedInsets = new InsetsFrameProvider[]{
                     BAR_PROVIDER_MAP[mBarType],
                     BAR_GESTURE_MAP.get(mSide)
             };
@@ -721,10 +723,8 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
             lp.windowAnimations = 0;
             lp.gravity = BAR_GRAVITY_MAP.get(mSide);
             lp.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
-            if (dockFeature()) {
-                lp.privateFlags = lp.privateFlags
-                        | WindowManager.LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP;
-            }
+            lp.privateFlags = lp.privateFlags
+                    | WindowManager.LayoutParams.PRIVATE_FLAG_INTERCEPT_GLOBAL_DRAG_AND_DROP;
             return lp;
         }
 

@@ -20,10 +20,10 @@ import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
 import android.view.Display
 import androidx.test.filters.SmallTest
-import com.android.systemui.SysuiTestCase
+import com.android.app.displaylib.DisplayRepository.PendingDisplay
+import com.android.systemui.CarSysuiTestCase
 import com.android.systemui.car.CarSystemUiTest
 import com.android.systemui.display.data.repository.DisplayRepository
-import com.android.systemui.display.data.repository.DisplayRepository.PendingDisplay
 import com.android.systemui.process.ProcessWrapper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelChildren
@@ -48,7 +48,7 @@ import org.mockito.kotlin.whenever
 @RunWith(AndroidTestingRunner::class)
 @RunWithLooper
 @SmallTest
-class ExternalDisplayControllerTest : SysuiTestCase() {
+class ExternalDisplayControllerTest : CarSysuiTestCase() {
 
     private val testScope = TestScope()
     private val bgDispatcher =
@@ -99,6 +99,8 @@ class FakeDisplayRepository(
     override val displayChangeEvent: Flow<Int> = emptyFlow(),
     override val displayAdditionEvent: Flow<Display?> = emptyFlow(),
     override val displayRemovalEvent: Flow<Int> = emptyFlow(),
+    override val displayIdsWithSystemDecorations: StateFlow<Set<Int>> =
+        MutableStateFlow(emptySet()),
     override val displays: StateFlow<Set<Display>> = MutableStateFlow(emptySet()),
     override val defaultDisplayOff: Flow<Boolean> = emptyFlow(),
     override val pendingDisplay: Flow<PendingDisplay?> = fakePendingDisplayFlow,

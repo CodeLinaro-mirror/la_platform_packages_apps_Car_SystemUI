@@ -16,6 +16,7 @@
 package com.android.systemui.car.wm.scalableui;
 
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 
 import static com.android.systemui.car.Flags.scalableUi;
 
@@ -34,12 +35,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.android.car.internal.dep.Trace;
-import com.android.car.scalableui.manager.Event;
-import com.android.car.scalableui.manager.PanelTransaction;
+import com.android.car.scalableui.model.Event;
+import com.android.car.scalableui.model.PanelTransaction;
 import com.android.car.scalableui.panel.Panel;
 import com.android.systemui.R;
+import com.android.systemui.car.wm.scalableui.panel.PanelUtils;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
-import com.android.systemui.car.wm.scalableui.panel.TaskPanelPool;
 import com.android.wm.shell.automotive.AutoTaskStackController;
 import com.android.wm.shell.automotive.AutoTaskStackState;
 import com.android.wm.shell.automotive.AutoTaskStackTransaction;
@@ -60,21 +61,25 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
             PanelAutoTaskStackTransitionHandlerDelegate.class.getSimpleName();
 
     private static final String EMPTY_EVENT_ID = "empty_event";
-    private static final Event EMPTY_EVENT = new Event(EMPTY_EVENT_ID);
+    private static final Event EMPTY_EVENT = new Event.Builder(EMPTY_EVENT_ID).build();
     private static final boolean DEBUG = Build.IS_DEBUGGABLE;
 
     private final AutoTaskStackController mAutoTaskStackController;
     private final TaskPanelTransitionCoordinator mTaskPanelTransitionCoordinator;
     private final Context mContext;
+    private PanelUtils mPanelUtils;
 
     @Inject
     public PanelAutoTaskStackTransitionHandlerDelegate(
             Context context,
             AutoTaskStackController autoTaskStackController,
-            TaskPanelTransitionCoordinator taskPanelTransitionCoordinator) {
+            TaskPanelTransitionCoordinator taskPanelTransitionCoordinator,
+            PanelUtils panelUtils
+    ) {
         mAutoTaskStackController = autoTaskStackController;
         mTaskPanelTransitionCoordinator = taskPanelTransitionCoordinator;
         mContext = context;
+        mPanelUtils = panelUtils;
     }
 
     /**
@@ -116,7 +121,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
         if (request.getTriggerTask() == null) {
             return false;
         }
-        return TaskPanelPool.handles(request.getTriggerTask().parentTaskId)
+        return mPanelUtils.handles(request.getTriggerTask().parentTaskId)
                 || request.getTriggerTask().topActivityType == ACTIVITY_TYPE_HOME;
     }
 
@@ -156,7 +161,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
             if (change.getTaskInfo() == null) {
                 continue;
             }
-            TaskPanel taskPanel = TaskPanelPool.getTaskPanel(
+            TaskPanel taskPanel = mPanelUtils.getTaskPanel(
                     tp -> tp.getRootTaskId() == change.getTaskInfo().taskId);
             if (taskPanel == null) {
                 continue;
@@ -169,6 +174,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
                 pos = change.getStartAbsBounds();
             }
             transaction.setPosition(leash, pos.left, pos.top);
+            transaction.setCornerRadius(leash, taskPanel.getCornerRadius());
             taskPanel.setLeash(leash);
 
             transaction.setLayer(leash, taskPanel.getLayer());
@@ -183,7 +189,15 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
         if (request.getTriggerTask().baseIntent.getCategories() != null
                 && request.getTriggerTask().baseIntent.getCategories().contains(
                 Intent.CATEGORY_HOME)) {
-            return new Event("_System_OnHomeEvent");
+            return new Event.Builder("_System_OnHomeEvent").build();
+        }
+
+        if ((request.getFlags() & TRANSIT_FLAG_AVOID_MOVE_TO_FRONT)
+                == TRANSIT_FLAG_AVOID_MOVE_TO_FRONT) {
+            if (DEBUG) {
+                Log.d(TAG, "Launching activity to the background, no panel action needed.");
+            }
+            return EMPTY_EVENT;
         }
 
         ComponentName component;
@@ -204,13 +218,13 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
         String panelId;
         TaskPanel panel = null;
         if (componentString != null) {
-            panel = TaskPanelPool.getTaskPanel(tp -> tp.handles(component));
+            panel = mPanelUtils.getTaskPanel(tp -> tp.handles(component));
         }
         if (panel == null) {
-            panel = TaskPanelPool.getTaskPanel(TaskPanel::isLaunchRoot);
+            panel = mPanelUtils.getTaskPanel(TaskPanel::isLaunchRoot);
         }
         if (panel != null) {
-            panelId = panel.getId();
+            panelId = panel.getPanelId();
         } else {
             // There is no panel ready to handle this event
             // TODO(b/392694590): determine if/how this case should be handled
@@ -219,13 +233,15 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
         }
 
         if (TransitionUtil.isClosingType(request.getType())) {
-            return new Event("_System_TaskCloseEvent")
+            return new Event.Builder("_System_TaskCloseEvent")
                     .addToken("panelId", panelId)
-                    .addToken("component", componentString);
+                    .addToken("component", componentString)
+                    .build();
         }
-        return new Event("_System_TaskOpenEvent")
+        return new Event.Builder("_System_TaskOpenEvent")
                 .addToken("panelId", panelId)
-                .addToken("component", componentString);
+                .addToken("component", componentString)
+                .build();
     }
 
     @Override

@@ -32,12 +32,13 @@ import com.android.systemui.car.wm.CarFullscreenTaskMonitorListener;
 import com.android.systemui.car.wm.scalableui.PanelAutoTaskStackTransitionHandlerDelegate;
 import com.android.systemui.car.wm.scalableui.PanelConfigReader;
 import com.android.systemui.car.wm.scalableui.ScalableUIWMInitializer;
+import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.wm.DisplaySystemBarsController;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.automotive.AutoShellModule;
-import com.android.wm.shell.automotive.TaskRepository;
+import com.android.wm.shell.automotive.AutoTaskRepository;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.ShellExecutor;
@@ -95,7 +96,7 @@ public abstract class CarWMShellModule {
             Optional<RecentTasksController> recentTasksOptional,
             Optional<WindowDecorViewModel> windowDecorViewModelOptional,
             TaskViewTransitions taskViewTransitions,
-            TaskRepository taskRepository) {
+            AutoTaskRepository taskRepository) {
         return new CarFullscreenTaskMonitorListener(context,
                 carServiceProvider,
                 shellInit,
@@ -147,12 +148,14 @@ public abstract class CarWMShellModule {
     @Provides
     static Optional<PanelConfigReader> providesPanelConfigReader(
             Context context,
-            TaskPanel.Factory taskPanelFactory
+            TaskPanel.Factory taskPanelFactory,
+            DecorPanel.Factory decorPanelFactory
     ) {
         if (isScalableUIEnabled(context)) {
             return Optional.of(new PanelConfigReader(
                     context,
-                    taskPanelFactory));
+                    taskPanelFactory,
+                    decorPanelFactory));
         }
         return Optional.empty();
     }

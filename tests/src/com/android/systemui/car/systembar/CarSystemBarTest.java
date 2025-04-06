@@ -41,6 +41,7 @@ import static org.mockito.Mockito.when;
 import android.app.ActivityManager;
 import android.content.res.Configuration;
 import android.graphics.Rect;
+import android.os.Handler;
 import android.os.RemoteException;
 import android.testing.AndroidTestingRunner;
 import android.testing.TestableLooper;
@@ -56,8 +57,8 @@ import androidx.test.filters.SmallTest;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.statusbar.RegisterStatusBarResult;
 import com.android.internal.view.AppearanceRegion;
+import com.android.systemui.CarSysuiTestCase;
 import com.android.systemui.R;
-import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarSystemUiTest;
@@ -78,6 +79,7 @@ import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.time.FakeSystemClock;
+import com.android.systemui.utils.os.FakeHandler;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -93,7 +95,7 @@ import org.mockito.MockitoAnnotations;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 @SmallTest
-public class CarSystemBarTest extends SysuiTestCase {
+public class CarSystemBarTest extends CarSysuiTestCase {
 
     private TestableResources mTestableResources;
     private SysuiTestableContext mSpiedContext;
@@ -159,6 +161,7 @@ public class CarSystemBarTest extends SysuiTestCase {
     private AppearanceRegion[] mAppearanceRegions;
     private FakeExecutor mUiBgExecutor;
     private SystemBarConfigs mSystemBarConfigs;
+    private Handler mHandler;
 
     @Before
     public void setUp() {
@@ -166,6 +169,7 @@ public class CarSystemBarTest extends SysuiTestCase {
         mTestableResources = mContext.getOrCreateTestableResources();
         mExecutor = new FakeExecutor(new FakeSystemClock());
         mUiBgExecutor = new FakeExecutor(new FakeSystemClock());
+        mHandler = new FakeHandler(TestableLooper.get(this).getLooper());
         mSpiedContext = spy(mContext);
         mSpiedContext.addMockSystemService(ActivityManager.class, mActivityManager);
         mSpiedContext.addMockSystemService(WindowManager.class, mWindowManager);
@@ -241,7 +245,8 @@ public class CarSystemBarTest extends SysuiTestCase {
                 mConfigurationController,
                 mCarSystemBarRestartTracker,
                 displayTracker,
-                null));
+                null,
+                mHandler));
     }
 
     @Test
