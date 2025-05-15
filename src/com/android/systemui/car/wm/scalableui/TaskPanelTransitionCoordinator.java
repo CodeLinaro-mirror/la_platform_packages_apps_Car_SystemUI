@@ -52,7 +52,9 @@ import com.android.wm.shell.automotive.AutoSurfaceTransactionFactory;
 import com.android.wm.shell.automotive.AutoTaskStackController;
 import com.android.wm.shell.automotive.AutoTaskStackState;
 import com.android.wm.shell.automotive.AutoTaskStackTransaction;
+import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.dagger.WMSingleton;
+import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.transition.Transitions;
 
 import java.util.ArrayList;
@@ -84,16 +86,19 @@ public class TaskPanelTransitionCoordinator {
     private final PanelUtils mPanelUtils;
     private IBinder mActiveTransition;
     private final AutoLayoutManager mAutoLayoutManager;
+    private final ShellExecutor mMainExecutor;
 
     @Inject
     public TaskPanelTransitionCoordinator(AutoTaskStackController autoTaskStackController,
             AutoSurfaceTransactionFactory autoSurfaceTransactionFactory,
             PanelUtils panelUtils,
-            AutoLayoutManager autoLayoutManager) {
+            AutoLayoutManager autoLayoutManager,
+            @ShellMainThread ShellExecutor mainExecutor) {
         mAutoTaskStackController = autoTaskStackController;
         mAutoSurfaceTransactionFactory = autoSurfaceTransactionFactory;
         mPanelUtils = panelUtils;
         mAutoLayoutManager = autoLayoutManager;
+        mMainExecutor = mainExecutor;
     }
 
     /**
@@ -104,14 +109,42 @@ public class TaskPanelTransitionCoordinator {
      *                    transition.
      */
     public void startTransition(PanelTransaction transaction) {
-        synchronized (mPendingPanelTransactions) {
-            if (transaction.hasWindowChanges()) {
-                IBinder transition = mAutoTaskStackController.startTransition(
-                        createAutoTaskStackTransaction(transaction));
-                mPendingPanelTransactions.put(transition, transaction);
-                playPendingAnimations(transition, null);
-            } else {
-                updatePanelSurface(transaction);
+        mMainExecutor.execute(() -> {
+            synchronized (mPendingPanelTransactions) {
+                if (transaction.hasWindowChanges()) {
+                    IBinder transition = mAutoTaskStackController.startTransition(
+                            createAutoTaskStackTransaction(transaction));
+                    mPendingPanelTransactions.put(transition, transaction);
+                    resetUnpreparedDecorPanel(transaction);
+                    playPendingAnimations(transition, null);
+                } else {
+                    updatePanelSurface(transaction);
+                }
+            }
+        });
+    }
+
+    /**
+     * Resets {@link DecorPanel} with no {@link AutoDecor} initialized.
+     *
+     * <p>This method iterates through each panel state defined in the provided
+     * {@code PanelTransaction}. For each entry, it attempts to find the corresponding
+     * {@code DecorPanel} using its ID. If a {@code DecorPanel} is found,and it does not have an
+     * associated {@link AutoDecor} and its target variant in the
+     * transaction
+     * is set to be visible, then the {@code DecorPanel} will be reset to its
+     * default state.
+     */
+    public void resetUnpreparedDecorPanel(PanelTransaction transaction) {
+        for (Map.Entry<String, Transition> entry : transaction.getPanelTransactionStates()) {
+            DecorPanel decorPanel = mPanelUtils.getDecorPanel(
+                    p -> p.getPanelId().equals(entry.getKey()));
+            if (decorPanel == null) {
+                continue;
+            }
+            Variant toVariant = entry.getValue().getToVariant();
+            if (decorPanel.getAutoDecor() == null && toVariant.isVisible()) {
+                decorPanel.reset();
             }
         }
     }
