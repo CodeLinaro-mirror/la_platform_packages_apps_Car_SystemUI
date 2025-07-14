@@ -273,8 +273,8 @@ public final class TaskPanel extends BasePanel {
 
     @VisibleForTesting
     void scheduleRestartAttempt(ActivityManager.RunningTaskInfo taskInfo) {
-        PanelState panelState = getPanelState();
-        if (scalableUiTaskAutoRestart() && panelState != null && panelState.getRestart() != null) {
+        if (hasRestart()) {
+            PanelState panelState = getPanelState();
             Restart restart = panelState.getRestart();
             if (mCurrentRetryCount < restart.getMaxRetry()) {
                 long delay = (long) (INITIAL_RETRY_DELAY_MS * Math.pow(2, mCurrentRetryCount));
@@ -307,12 +307,17 @@ public final class TaskPanel extends BasePanel {
                         .setPanelId(getPanelId()).build());
             }
         } else {
-            logIfDebuggable(
-                    "scheduleRestartAttempt: No restart policy found, sending empty event.");
-            mEventDispatcher.executeEvent(new Event.Builder(
-                    SYSTEM_TASK_PANEL_EMPTY_EVENT_ID)
-                    .setPanelId(getPanelId()).build());
+            logIfDebuggable("scheduleRestartAttempt: No restart policy found.");
         }
+    }
+
+    /**
+     * Whether or not this task panel has {@link Restart} set and enabled on it.
+     * @return true if the panel has task restart enabled
+     */
+    public boolean hasRestart() {
+        PanelState panelState = getPanelState();
+        return scalableUiTaskAutoRestart() && panelState != null && panelState.getRestart() != null;
     }
 
     @Override
@@ -524,9 +529,11 @@ public final class TaskPanel extends BasePanel {
     }
 
     @Override
-    public void setRole(@NonNull Role role) {
+    public void setRole(@Nullable Role role) {
         if (getRole() == role) return;
         super.setRole(role);
+
+        if (getRole() == null) return;
 
         if (getRole().isDefault()) {
             mIsLaunchRoot = true;
@@ -645,8 +652,8 @@ public final class TaskPanel extends BasePanel {
             return;
         }
 
-        if (getRole().getPersistedActivities() == null
-                || getRole().getPersistedActivities().length == 0) {
+        if (getRole() != null && (getRole().getPersistedActivities() == null
+                || getRole().getPersistedActivities().length == 0)) {
             if (DEBUG) {
                 Log.d(TAG, "Persistent Activities is empty, [" + getPanelId() + "]");
             }
