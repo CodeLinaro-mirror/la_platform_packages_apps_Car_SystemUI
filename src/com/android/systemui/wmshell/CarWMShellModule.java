@@ -44,6 +44,7 @@ import com.android.systemui.car.wm.scalableui.ScalableUIWMInitializer;
 import com.android.systemui.car.wm.scalableui.panel.BasePanel;
 import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
+import com.android.systemui.car.wm.scalableui.panel.controller.PanelControllerModule;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.PanelUpdateConsumer;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.ScalableUIPanelUpdateImpl;
 import com.android.systemui.car.wm.scalableui.systemwindow.SystemBarWindow;
@@ -97,7 +98,8 @@ import java.util.Optional;
 import javax.inject.Named;
 
 /** Provides dependencies from {@link com.android.wm.shell} for CarSystemUI. */
-@Module(includes = {WMShellBaseModule.class, AutoShellModule.class, LetterboxModule.class})
+@Module(includes = {WMShellBaseModule.class, AutoShellModule.class, LetterboxModule.class,
+        PanelControllerModule.class})
 public abstract class CarWMShellModule {
 
     @WMSingleton
@@ -290,8 +292,13 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarWindow> provideLeftSystemBarWindow(Context context,
             Optional<PanelUpdateConsumer> consumer, EventDispatcher dispatcher) {
         if (consumer.isPresent()) {
-            return Optional.of(
-                    new SystemBarWindow(context, consumer, dispatcher, SYSTEM_BAR_PANEL_LEFT_ID));
+            try {
+                return Optional.of(
+                        new SystemBarWindow(context, consumer, dispatcher,
+                                SYSTEM_BAR_PANEL_LEFT_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -302,8 +309,13 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarWindow> provideTopSystemBarWindow(Context context,
             Optional<PanelUpdateConsumer> consumer, EventDispatcher dispatcher) {
         if (consumer.isPresent()) {
-            return Optional.of(
-                    new SystemBarWindow(context, consumer, dispatcher, SYSTEM_BAR_PANEL_TOP_ID));
+            try {
+                return Optional.of(
+                        new SystemBarWindow(context, consumer, dispatcher,
+                                SYSTEM_BAR_PANEL_TOP_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -314,8 +326,13 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarWindow> provideRightSystemBarWindow(Context context,
             Optional<PanelUpdateConsumer> consumer, EventDispatcher dispatcher) {
         if (consumer.isPresent()) {
-            return Optional.of(
-                    new SystemBarWindow(context, consumer, dispatcher, SYSTEM_BAR_PANEL_RIGHT_ID));
+            try {
+                return Optional.of(
+                        new SystemBarWindow(context, consumer, dispatcher,
+                                SYSTEM_BAR_PANEL_RIGHT_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -326,8 +343,13 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarWindow> provideBottomSystemBarWindow(Context context,
             Optional<PanelUpdateConsumer> consumer, EventDispatcher dispatcher) {
         if (consumer.isPresent()) {
-            return Optional.of(
-                    new SystemBarWindow(context, consumer, dispatcher, SYSTEM_BAR_PANEL_BOTTOM_ID));
+            try {
+                return Optional.of(
+                        new SystemBarWindow(context, consumer, dispatcher,
+                                SYSTEM_BAR_PANEL_BOTTOM_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -338,7 +360,11 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarConfiguration> provideLeftSystemBarConfiguration(
             Optional<PanelUpdateConsumer> consumer) {
         if (consumer.isPresent()) {
-            return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_LEFT_ID));
+            try {
+                return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_LEFT_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -349,7 +375,11 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarConfiguration> provideTopSystemBarConfiguration(
             Optional<PanelUpdateConsumer> consumer) {
         if (consumer.isPresent()) {
-            return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_TOP_ID));
+            try {
+                return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_TOP_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -360,7 +390,11 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarConfiguration> provideRightSystemBarConfiguration(
             Optional<PanelUpdateConsumer> consumer) {
         if (consumer.isPresent()) {
-            return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_RIGHT_ID));
+            try {
+                return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_RIGHT_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
@@ -371,7 +405,12 @@ public abstract class CarWMShellModule {
     static Optional<SystemBarConfiguration> provideBottomSystemBarConfiguration(
             Optional<PanelUpdateConsumer> consumer) {
         if (consumer.isPresent()) {
-            return Optional.of(new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_BOTTOM_ID));
+            try {
+                return Optional.of(
+                        new SystemBarConfiguration(consumer, SYSTEM_BAR_PANEL_BOTTOM_ID));
+            } catch (IllegalStateException e) {
+                return Optional.empty();
+            }
         }
         return Optional.empty();
     }
