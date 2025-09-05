@@ -462,12 +462,21 @@
     <dimen name="data_subscription_pop_up_arrow_height">19dp</dimen>
     <dimen name="data_subscription_pop_up_arrow_width">38dp</dimen>
     <dimen name="data_subscription_pop_up_arrow_radius">5dp</dimen>
-    <dimen name="data_subscription_pop_up_arrow_offset">84dp</dimen>
+    <dimen name="data_subscription_pop_up_arrow_offset">130dp</dimen>
     <dimen name="data_subscription_pop_up_vertical_padding">46dp</dimen>
     <dimen name="data_subscription_pop_up_horizontal_padding">@*android:dimen/car_padding_3</dimen>
     <dimen name="data_subscription_pop_up_button_width">224dp</dimen>
     <dimen name="data_subscription_pop_up_button_height">68dp</dimen>
     <dimen name="data_subscription_pop_up_horizontal_margin">15dp</dimen>
-    <dimen name="data_subscription_pop_up_horizontal_offset">92dp</dimen>
+    <dimen name="data_subscription_pop_up_horizontal_offset">108dp</dimen>
     <dimen name="data_subscription_pop_up_vertical_offset">6dp</dimen>
+
+     <!-- Dimens for Floating Back Button -->
+    <dimen name="fab_corner_radius_50">50dp</dimen>
+    <dimen name="fab_corner_radius_zero">0dp</dimen>
+    <dimen name="fab_shape_height">60dp</dimen>
+    <dimen name="fab_shape_width">80dp</dimen>
+
+
+    <dimen name="freeform_decor_caption_height">68dp</dimen>
 </resources>

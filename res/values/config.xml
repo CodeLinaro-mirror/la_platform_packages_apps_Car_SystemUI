@@ -130,6 +130,7 @@
         <item>com.android.systemui.car.statusicon.ui.BluetoothStatusIconController</item>
         <item>com.android.systemui.car.statusicon.ui.SignalStatusIconController</item>
         <item>com.android.systemui.car.statusicon.ui.DisplayStatusIconController</item>
+        <item>com.android.systemui.car.statusicon.ui.DebugStatusIconController</item>
     </string-array>
 
     <string-array name="config_quickControlsSubIconControllers" translatable="false">
@@ -279,4 +280,31 @@
         <item>com.android.car.settings</item>
         <item>com.android.car.carlauncher</item>
     </string-array>
+
+    <!--
+       The devices that certain debug features should be shown on.
+       Emulators are included by default.
+   -->
+    <string-array name="config_debug_support_devices">
+    </string-array>
+    <!--
+        The devices that certain debug features should be shown on, but the builds on real vehicles
+        should be excluded.
+    -->
+    <string-array name="config_debug_support_devices_exclude_car">
+    </string-array>
+
+    <!-- Determines whether to show the display compatibility toolbar. -->
+    <!-- 0 disabled -->
+    <!-- 1 enabled -->
+    <integer name="config_showDisplayCompatToolbar">1</integer>
+
+    <!-- Determines whether to show the display compatibility toolbar on System Bar -->
+    <!-- 0 disabled -->
+    <!-- 1 enabled -->
+    <integer name="config_showDisplayCompatToolbarOnSystemBar">0</integer>
+
+    <!-- Determines whether to show the display compatibility window decoration. -->
+    <bool name="config_showDisplayCompatWindowDecoration">false</bool>
+
 </resources>

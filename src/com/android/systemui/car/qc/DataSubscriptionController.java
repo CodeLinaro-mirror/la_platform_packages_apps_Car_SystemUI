@@ -27,6 +27,7 @@ import android.app.TaskStackListener;
 import android.car.drivingstate.CarUxRestrictions;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -36,6 +37,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.os.Build;
 import android.os.Handler;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -49,13 +51,19 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
 import com.android.car.datasubscription.DataSubscription;
+import com.android.car.datasubscription.DataSubscriptionStatus;
 import com.android.car.ui.utils.CarUxRestrictionsUtil;
 import com.android.systemui.R;
+import com.android.systemui.car.qc.DataSubscriptionStatsLogHelper.DataSubscriptionMessageType;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.settings.UserTracker;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -75,6 +83,8 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
     private static final String TAG = DataSubscriptionController.class.toString();
     private static final String DATA_SUBSCRIPTION_ACTION =
             "android.intent.action.DATA_SUBSCRIPTION";
+    private static final String DATA_SUBSCRIPTION_SHARED_PREFERENCE_PATH =
+            "com.android.car.systemui.car.qc.DataSubscriptionController";
     // Timeout for network callback in ms
     private static final int CALLBACK_TIMEOUT_MS = 1000;
     private final Context mContext;
@@ -92,6 +102,7 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
     private Set<String> mPackagesBlocklist;
     private CountDownLatch mLatch;
     private boolean mIsNetworkCallbackRegistered;
+    private final DataSubscriptionStatsLogHelper mDataSubscriptionStatsLogHelper;
     private final TaskStackListener mTaskStackListener = new TaskStackListener() {
         @SuppressLint("MissingPermission")
         @Override
@@ -151,9 +162,6 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
                         if (!mNetworkCallback.isNetworkAvailable()) {
                             mNetworkCapabilities = null;
                             updateShouldDisplayReactiveMsg();
-                            if (mShouldDisplayReactiveMsg) {
-                                showPopUpWindow();
-                            }
                         }
                     }
                 });
@@ -170,7 +178,12 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
                     mIsDistractionOptimizationRequired =
                             carUxRestrictions.isRequiresDistractionOptimization();
                     if (mIsProactiveMsg) {
-                        updateShouldDisplayProactiveMsg();
+                        if (mIsDistractionOptimizationRequired
+                                && mPopupWindow != null
+                                && mPopupWindow.isShowing()) {
+                            mPopupWindow.dismiss();
+                            mDataSubscriptionStatsLogHelper.logSessionFinished();
+                        }
                     } else {
                         updateExplorationButtonVisibility();
                         mPopupWindow.update();
@@ -193,18 +206,38 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
     private CharSequence mTopLabel;
     private NetworkCapabilities mNetworkCapabilities;
     private boolean mIsUxRestrictionsListenerRegistered;
+    private SharedPreferences mSharedPreferences;
+    private SharedPreferences.Editor mEditor;
+    private int mCurrentInterval;
+    private int mCurrentCycle;
+    private int mCurrentActiveDays;
+
+    @VisibleForTesting
+    static final String KEY_PREV_POPUP_DATE =
+            "com.android.car.systemui.car.qc.PREV_DATE";
+    @VisibleForTesting
+    static final String KEY_PREV_POPUP_CYCLE =
+            "com.android.car.systemui.car.qc.PREV_CYCLE";
+    @VisibleForTesting
+    static final String KEY_PREV_POPUP_ACTIVE_DAYS =
+            "com.android.car.systemui.car.qc.PREV_ACTIVE_DAYS";
+    @VisibleForTesting
+    static final String KEY_PREV_POPUP_STATUS =
+            "com.android.car.systemui.car.qc.PREV_STATUS";
 
     @SuppressLint("MissingPermission")
     @Inject
     public DataSubscriptionController(Context context,
             UserTracker userTracker,
             @Main Handler mainHandler,
-            @Background Executor backgroundExecutor) {
+            @Background Executor backgroundExecutor,
+            DataSubscriptionStatsLogHelper dataSubscriptionStatsLogHelper) {
         mContext = context;
         mSubscription = new DataSubscription(context);
         mUserTracker = userTracker;
         mMainHandler = mainHandler;
         mBackGroundExecutor = backgroundExecutor;
+        mDataSubscriptionStatsLogHelper = dataSubscriptionStatsLogHelper;
         mIntent = new Intent(DATA_SUBSCRIPTION_ACTION);
         mIntent.setPackage(mContext.getString(
                 R.string.connectivity_flow_app));
@@ -217,6 +250,8 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
         int height = LinearLayout.LayoutParams.WRAP_CONTENT;
         boolean focusable = true;
         mPopupWindow = new PopupWindow(mPopupView, width, height, focusable);
+        mPopupWindow.setTouchModal(false);
+        mPopupWindow.setOutsideTouchable(true);
         mPopupView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -225,6 +260,7 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
                     if (!mWasProactiveMsgDisplayed) {
                         mWasProactiveMsgDisplayed = true;
                     }
+                    mDataSubscriptionStatsLogHelper.logSessionFinished();
                 }
                 return true;
             }
@@ -233,8 +269,9 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
         mExplorationButton = mPopupView.findViewById(
                 R.id.data_subscription_explore_options_button);
         mExplorationButton.setOnClickListener(v -> {
-            mContext.startActivityAsUser(mIntent, mUserTracker.getUserHandle());
             mPopupWindow.dismiss();
+            mContext.startActivityAsUser(mIntent, mUserTracker.getUserHandle());
+            mDataSubscriptionStatsLogHelper.logButtonClicked();
         });
         mConnectivityManager = mContext.getSystemService(ConnectivityManager.class);
         mNetworkCallback = new DataSubscriptionNetworkCallback();
@@ -252,21 +289,31 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
         } catch (Exception e) {
             Log.e(TAG, "error while registering TaskStackListener " + e);
         }
+        mSharedPreferences = mContext.getSharedPreferences(
+                DATA_SUBSCRIPTION_SHARED_PREFERENCE_PATH, Context.MODE_PRIVATE);
+        mEditor = mSharedPreferences.edit();
     }
 
-    private void updateShouldDisplayProactiveMsg() {
+    void updateShouldDisplayProactiveMsg() {
         if (mIsDistractionOptimizationRequired) {
             if (mPopupWindow != null && mPopupWindow.isShowing()) {
                 mPopupWindow.dismiss();
+                mDataSubscriptionStatsLogHelper.logSessionFinished();
             }
         } else {
             // Determines whether a proactive message should be displayed
             mShouldDisplayProactiveMsg = !mWasProactiveMsgDisplayed
-                    && mSubscription.isDataSubscriptionInactive();
+                    && mSubscription.isDataSubscriptionInactive()
+                    && isValidTimeInterval()
+                    && isValidCycle()
+                    && isValidActiveDays();
             if (mShouldDisplayProactiveMsg && mPopupWindow != null
                     && !mPopupWindow.isShowing()) {
                 mIsProactiveMsg = true;
                 showPopUpWindow();
+                writeLatestPopupDate();
+                writeLatestPopupCycle();
+                writeLatestPopupActiveDays();
             }
         }
     }
@@ -284,6 +331,7 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
             } else {
                 if (mPopupWindow != null && mPopupWindow.isShowing()) {
                     mPopupWindow.dismiss();
+                    mDataSubscriptionStatsLogHelper.logSessionFinished();
                 }
             }
         }
@@ -308,8 +356,12 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
                     if (popUpPrompt != null) {
                         if (mIsProactiveMsg) {
                             popUpPrompt.setText(R.string.data_subscription_proactive_msg_prompt);
+                            mDataSubscriptionStatsLogHelper.logSessionStarted(
+                                    DataSubscriptionMessageType.PROACTIVE);
                         } else {
                             popUpPrompt.setText(getReactiveMsg());
+                            mDataSubscriptionStatsLogHelper.logSessionStarted(
+                                    DataSubscriptionMessageType.REACTIVE);
                         }
                     }
                     int xOffsetInPx = mContext.getResources().getDimensionPixelSize(
@@ -320,11 +372,14 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
                     mAnchorView.getHandler().postDelayed(new Runnable() {
 
                         public void run() {
-                            mPopupWindow.dismiss();
-                            mWasProactiveMsgDisplayed = true;
-                            // after the proactive msg dismisses, it won't get displayed again hence
-                            // the msg from now on will just be reactive
-                            mIsProactiveMsg = false;
+                            if (mPopupWindow.isShowing()) {
+                                mPopupWindow.dismiss();
+                                mWasProactiveMsgDisplayed = true;
+                                // after the proactive msg dismisses, it won't get displayed again
+                                // hence the msg from now on will just be reactive
+                                mIsProactiveMsg = false;
+                                mDataSubscriptionStatsLogHelper.logSessionFinished();
+                            }
                         }
                     }, mPopUpTimeOut);
                 }
@@ -338,6 +393,10 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
         if (mAnchorView != null && !mIsDataSubscriptionListenerRegistered) {
             mSubscription.addDataSubscriptionListener(this);
             mIsDataSubscriptionListenerRegistered = true;
+            updateCurrentStatus();
+            updateCurrentInterval();
+            updateCurrentCycle();
+            updateCurrentActiveDays();
             updateShouldDisplayProactiveMsg();
             if (!mIsUxRestrictionsListenerRegistered) {
                 CarUxRestrictionsUtil.getInstance(mContext).register(
@@ -376,6 +435,7 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
 
     @Override
     public void onChange(int value) {
+        updateCurrentStatus();
         updateShouldDisplayProactiveMsg();
     }
 
@@ -401,14 +461,84 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
             mIsNetworkAvailable = true;
             mNetworkCapabilities = networkCapabilities;
             updateShouldDisplayReactiveMsg();
-            if (mShouldDisplayReactiveMsg) {
-                showPopUpWindow();
-            }
         }
 
         public boolean isNetworkAvailable() {
             return mIsNetworkAvailable;
         }
+    }
+
+    private boolean isValidTimeInterval() {
+        return mCurrentInterval >= mContext.getResources().getInteger(
+                R.integer.data_subscription_pop_up_frequency);
+    }
+
+    private boolean isValidCycle() {
+        if (mCurrentCycle == 1) {
+            return true;
+        }
+        return mCurrentCycle <= mContext.getResources().getInteger(
+                R.integer.data_subscription_pop_up_startup_cycle_limit);
+    }
+
+    private boolean isValidActiveDays() {
+        if (mCurrentActiveDays == 1) {
+            return true;
+        }
+        return mCurrentActiveDays <= mContext.getResources().getInteger(
+                R.integer.data_subscription_pop_up_active_days_limit);
+    }
+
+    private void updateCurrentStatus() {
+        int prevStatus = mSharedPreferences.getInt(KEY_PREV_POPUP_STATUS, 0);
+        int currentStatus = mSubscription.getDataSubscriptionStatus();
+        if (prevStatus == DataSubscriptionStatus.INACTIVE && prevStatus != currentStatus) {
+            mEditor.clear();
+            mEditor.apply();
+        }
+        mEditor.putInt(KEY_PREV_POPUP_STATUS, currentStatus);
+        mEditor.apply();
+    }
+
+    private void updateCurrentInterval() {
+        mCurrentInterval = mContext.getResources().getInteger(
+                R.integer.data_subscription_pop_up_frequency);
+        String prevDate = mSharedPreferences.getString(KEY_PREV_POPUP_DATE, /* defValue=*/ "");
+        if (!TextUtils.isEmpty(prevDate)) {
+            mCurrentInterval = (int) ChronoUnit.DAYS.between(LocalDate.parse(prevDate),
+                    LocalDate.now(ZoneId.systemDefault()));
+        }
+    }
+
+    private void updateCurrentCycle() {
+        mCurrentCycle = mSharedPreferences.getInt(
+                KEY_PREV_POPUP_CYCLE, /* defValue=*/ 0);
+
+    }
+
+    private void updateCurrentActiveDays() {
+        mCurrentActiveDays = mSharedPreferences.getInt(
+                KEY_PREV_POPUP_ACTIVE_DAYS, /* defValue=*/ 0);
+    }
+
+    private void writeLatestPopupDate() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        LocalDate newDate = LocalDate.now(ZoneId.systemDefault());
+        String formattedNewDate = newDate.format(formatter);
+        mEditor.putString(KEY_PREV_POPUP_DATE, formattedNewDate);
+        mEditor.apply();
+    }
+
+    private void writeLatestPopupCycle() {
+        mEditor.putInt(KEY_PREV_POPUP_CYCLE, mSharedPreferences.getInt(
+                KEY_PREV_POPUP_CYCLE, /* defValue=*/ 1) + 1);
+        mEditor.apply();
+    }
+
+    private void writeLatestPopupActiveDays() {
+        mEditor.putInt(KEY_PREV_POPUP_ACTIVE_DAYS, mSharedPreferences.getInt(
+                KEY_PREV_POPUP_ACTIVE_DAYS, /* defValue=*/ 1) + 1);
+        mEditor.apply();
     }
 
     @VisibleForTesting
@@ -477,6 +607,26 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
     }
 
     @VisibleForTesting
+    void setSharedPreference(SharedPreferences sharedPreference) {
+        mSharedPreferences = sharedPreference;
+    }
+
+    @VisibleForTesting
+    void setCurrentInterval(int currentInterval) {
+        mCurrentInterval = currentInterval;
+    }
+
+    @VisibleForTesting
+    void setCurrentCycle(int cycle) {
+        mCurrentCycle = cycle;
+    }
+
+    @VisibleForTesting
+    void setCurrentActiveDays(int activeDays) {
+        mCurrentActiveDays = activeDays;
+    }
+
+    @VisibleForTesting
     void setWasProactiveMsgDisplayed(boolean value) {
         mWasProactiveMsgDisplayed = value;
     }
@@ -484,5 +634,6 @@ public class DataSubscriptionController implements DataSubscription.DataSubscrip
     @VisibleForTesting
     void setIsDataSubscriptionListenerRegistered(boolean value) {
         mIsDataSubscriptionListenerRegistered = value;
-    }}
+    }
+}
 
