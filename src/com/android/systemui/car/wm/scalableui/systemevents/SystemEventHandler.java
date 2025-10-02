@@ -29,6 +29,7 @@ import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventCon
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_USER_SWITCH_COMPLETE_EVENT_ID;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_USER_SWITCH_ON_AUTHENTICATED_TOKEN_ID;
 
+import android.annotation.SuppressLint;
 import android.app.KeyguardManager;
 import android.car.user.CarUserManager;
 import android.content.Context;
@@ -59,11 +60,13 @@ import com.android.systemui.car.display.DisplayStateHelper;
 import com.android.systemui.car.flags.Flag;
 import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
+import com.android.systemui.car.wm.scalableui.ScalableUIUtils;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.settings.DisplayTracker;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
+import com.android.window.flags.Flags;
 
 import dagger.Lazy;
 
@@ -83,6 +86,7 @@ import javax.inject.Inject;
  * the device
  * is being set up.
  */
+@SuppressLint("MissingPermission")
 @SysUISingleton
 public class SystemEventHandler implements CoreStartable,
         ConfigurationController.ConfigurationListener {
@@ -133,13 +137,13 @@ public class SystemEventHandler implements CoreStartable,
                     } else if (event.getEventType() == USER_LIFECYCLE_EVENT_TYPE_UNLOCKED) {
                         if (shouldResetPanels()) {
                             Log.d(TAG, "Resetting panels during user unlock");
-                            // TODO(b/432217693): remove once visibility barrier is not home
-                            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-                            homeIntent.addCategory(Intent.CATEGORY_HOME);
-                            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            mContext.startActivityAsUser(homeIntent,
-                                    mUserTracker.getUserHandle());
-
+                            if (!Flags.homeActivityAlwaysPresent()) {
+                                Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+                                homeIntent.addCategory(Intent.CATEGORY_HOME);
+                                homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                mContext.startActivityAsUser(homeIntent,
+                                        mUserTracker.getUserHandle());
+                            }
                             StateManager.handlePanelReset();
                             mResetCalledForUser = true;
 
@@ -273,7 +277,7 @@ public class SystemEventHandler implements CoreStartable,
 
     @Override
     public void start() {
-        if (mFlagManager.isEnabled(Flag.ScalableUIEnabled)) {
+        if (ScalableUIUtils.isScalableUIEnabled(mContext, mFlagManager)) {
             registerUserEventListener();
             registerProvisionedStateListener();
             mUserTracker.addCallback(mUserTrackerCallback, mBackgroundExecutor);
