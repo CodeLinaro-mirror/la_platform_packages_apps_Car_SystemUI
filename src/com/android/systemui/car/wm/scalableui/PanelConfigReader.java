@@ -32,8 +32,8 @@ import com.android.car.scalableui.panel.PanelPool;
 import com.android.systemui.R;
 import com.android.systemui.car.flags.Flag;
 import com.android.systemui.car.flags.FlagManager;
-import com.android.systemui.car.wm.scalableui.panel.BasePanel;
 import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
+import com.android.systemui.car.wm.scalableui.panel.SysUIPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.wm.shell.dagger.WMSingleton;
 
@@ -47,17 +47,17 @@ public class PanelConfigReader {
     private final Context mContext;
     private final TaskPanel.Factory mTaskPanelFactory;
     private final DecorPanel.Factory mDecorPanelFactory;
-    private final BasePanel.Factory mBasePanelFactory;
+    private final SysUIPanel.Factory mSysUiPanelFactory;
     private final FlagManager mFlagManager;
 
     public PanelConfigReader(Context context, TaskPanel.Factory taskPanelFactory,
-            DecorPanel.Factory decorPanelFactory, BasePanel.Factory basePanelFactory,
+            DecorPanel.Factory decorPanelFactory, SysUIPanel.Factory sysUiPanelFactory,
             FlagManager flagManager) {
         mFlagManager = flagManager;
         mContext = context;
         mTaskPanelFactory = taskPanelFactory;
         mDecorPanelFactory = decorPanelFactory;
-        mBasePanelFactory = basePanelFactory;
+        mSysUiPanelFactory = sysUiPanelFactory;
     }
 
     /**
@@ -69,7 +69,7 @@ public class PanelConfigReader {
             if (type == PanelType.DECOR) {
                 return mDecorPanelFactory.create(id);
             } else if (type == PanelType.SYSTEM_BAR || type == PanelType.HUN) {
-                return mBasePanelFactory.create(id);
+                return mSysUiPanelFactory.create(id);
             } else {
                 return mTaskPanelFactory.create(id);
             }
@@ -143,7 +143,9 @@ public class PanelConfigReader {
     private void loadFromXml() {
         debugLog("Loading panel states from XML");
         Resources res = mContext.getResources();
-        try (TypedArray states = res.obtainTypedArray(R.array.window_states)) {
+        int windowStatesRes = mFlagManager.getResourceId(Flag.EnableExtPanelUpdates,
+                R.array.window_states);
+        try (TypedArray states = res.obtainTypedArray(windowStatesRes)) {
             debugLog("Found win state length = " + states.length());
             for (int i = 0; i < states.length(); i++) {
                 int xmlResId = states.getResourceId(i, 0);
