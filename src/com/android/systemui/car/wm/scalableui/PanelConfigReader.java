@@ -22,24 +22,23 @@ import android.content.res.TypedArray;
 import android.os.Build;
 import android.util.Log;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.util.List;
-
 import com.android.car.internal.dep.Trace;
-import com.android.car.scalableui.designcompose.DocLoadException;
 import com.android.car.scalableui.designcompose.PanelStateDocLoader;
 import com.android.car.scalableui.loader.xml.XmlModelLoader;
 import com.android.car.scalableui.manager.StateManager;
 import com.android.car.scalableui.model.PanelState;
+import com.android.car.scalableui.model.PanelType;
 import com.android.car.scalableui.panel.PanelPool;
 import com.android.systemui.R;
+import com.android.systemui.car.flags.Flag;
+import com.android.systemui.car.flags.FlagManager;
+import com.android.systemui.car.wm.scalableui.panel.BasePanel;
 import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.wm.shell.dagger.WMSingleton;
 
-import static com.android.systemui.car.Flags.scalableUiDesignCompose;
+import java.io.InputStream;
+import java.util.List;
 
 @WMSingleton
 public class PanelConfigReader {
@@ -48,13 +47,18 @@ public class PanelConfigReader {
     private final Context mContext;
     private final TaskPanel.Factory mTaskPanelFactory;
     private final DecorPanel.Factory mDecorPanelFactory;
+    private final BasePanel.Factory mBasePanelFactory;
+    private final FlagManager mFlagManager;
 
     public PanelConfigReader(Context context, TaskPanel.Factory taskPanelFactory,
-            DecorPanel.Factory decorPanelFactory) {
+            DecorPanel.Factory decorPanelFactory, BasePanel.Factory basePanelFactory,
+            FlagManager flagManager) {
+        mFlagManager = flagManager;
         debugLog("PanelConfig initialized user: " + ActivityManager.getCurrentUser());
         mContext = context;
         mTaskPanelFactory = taskPanelFactory;
         mDecorPanelFactory = decorPanelFactory;
+        mBasePanelFactory = basePanelFactory;
     }
 
     /**
@@ -62,9 +66,11 @@ public class PanelConfigReader {
      */
     public void init() {
         PanelPool.getInstance().clearPanels();
-        PanelPool.getInstance().setDelegate(id -> {
-            if (id.startsWith(PanelState.DECOR_PANEL_ID_PREFIX)) {
+        PanelPool.getInstance().setDelegate((id, type) -> {
+            if (type == PanelType.DECOR) {
                 return mDecorPanelFactory.create(id);
+            } else if (type == PanelType.SYSTEM_BAR) {
+                return mBasePanelFactory.create(id);
             } else {
                 return mTaskPanelFactory.create(id);
             }
@@ -74,7 +80,7 @@ public class PanelConfigReader {
             Trace.beginSection(TAG + "#init");
             StateManager.clearStates();
 
-            if (scalableUiDesignCompose()) {
+            if (mFlagManager.isEnabled(Flag.ScalableUiDesignCompose)) {
                 loadFromDcf();
             } else {
                 loadFromXml();
@@ -120,7 +126,9 @@ public class PanelConfigReader {
                 debugLog("PanelConfig adding state: " + xmlResId);
                 XmlModelLoader loader = new XmlModelLoader(mContext);
                 PanelState panelState = loader.createPanelState(xmlResId);
-                StateManager.addState(panelState);
+                if (panelState != null) {
+                    StateManager.addState(panelState);
+                }
             }
         }
     }

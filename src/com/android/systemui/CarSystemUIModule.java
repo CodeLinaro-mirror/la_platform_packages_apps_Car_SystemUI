@@ -36,6 +36,7 @@ import com.android.systemui.car.decor.CarPrivacyChipDecorProviderFactory;
 import com.android.systemui.car.decor.CarPrivacyChipViewController;
 import com.android.systemui.car.displayconfig.ExternalDisplayController;
 import com.android.systemui.car.drivemode.DriveModeModule;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.keyguard.CarKeyguardViewController;
 import com.android.systemui.car.notification.NotificationShadeWindowControllerImpl;
 import com.android.systemui.car.statusbar.DozeServiceHost;
@@ -51,9 +52,10 @@ import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent;
 import com.android.systemui.dock.DockManager;
 import com.android.systemui.dock.DockManagerImpl;
 import com.android.systemui.doze.DozeHost;
+import com.android.systemui.dreams.suppression.dagger.NoOpActivityRecognitionModule;
+import com.android.systemui.lowlight.dagger.NoopAmbientLightModeMonitorModule;
 import com.android.systemui.media.muteawait.MediaMuteAwaitConnectionCli;
 import com.android.systemui.media.nearby.NearbyMediaDevicesManager;
-import com.android.systemui.Flags;
 import com.android.systemui.minmode.MinModeManager;
 import com.android.systemui.minmode.MinModeManagerImpl;
 import com.android.systemui.navigationbar.NoopNavigationBarControllerModule;
@@ -88,8 +90,8 @@ import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
 
-import java.util.concurrent.Executor;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -111,8 +113,10 @@ import javax.inject.Provider;
                 KeyguardDisplayModule.class,
                 MediaMuteAwaitConnectionCli.StartableModule.class,
                 NearbyMediaDevicesManager.StartableModule.class,
+                NoOpActivityRecognitionModule.class,
                 NoopNavigationBarControllerModule.class,
                 NoopPosturingModule.class,
+                NoopAmbientLightModeMonitorModule.class,
                 NoopWallpaperModule.class,
                 PowerModule.class,
                 QSModule.class,
@@ -124,10 +128,14 @@ import javax.inject.Provider;
                 WindowRootViewBlurNotSupportedModule.class
         },
         subcomponents = {
-                SystemUIDisplaySubcomponent.class
+                CarSysUIDisplaySubcomponent.class
         }
 )
 abstract class CarSystemUIModule {
+
+    @Binds
+    abstract SystemUIDisplaySubcomponent.Factory displaySubComponentFactory(
+            CarSysUIDisplaySubcomponent.Factory factory);
 
     @SysUISingleton
     @Provides
@@ -235,5 +243,11 @@ abstract class CarSystemUIModule {
         } else {
             return Optional.empty();
         }
+    }
+
+    @Provides
+    @SysUISingleton
+    static FlagManager provideFlagManager(Context context) {
+        return new FlagManager(context);
     }
 }

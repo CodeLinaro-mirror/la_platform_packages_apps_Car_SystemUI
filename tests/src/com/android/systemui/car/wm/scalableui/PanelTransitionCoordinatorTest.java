@@ -29,6 +29,8 @@ import android.animation.ValueAnimator;
 import android.os.Binder;
 import android.os.IBinder;
 import android.testing.TestableLooper;
+import android.view.SurfaceControl;
+import android.window.TransitionInfo;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
@@ -38,6 +40,7 @@ import com.android.car.scalableui.model.PanelTransaction;
 import com.android.systemui.CarSysuiTestCase;
 import com.android.systemui.ShellSyncExecutor;
 import com.android.systemui.car.CarSystemUiTest;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.scalableui.panel.PanelUtils;
 import com.android.wm.shell.automotive.AutoLayoutManager;
 import com.android.wm.shell.automotive.AutoSurfaceTransaction;
@@ -68,6 +71,10 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
     @Mock
     private Transitions.TransitionFinishCallback mFinishCallback;
     @Mock
+    private SurfaceControl.Transaction mFinishTransaction;
+    @Mock
+    private TransitionInfo mInfo;
+    @Mock
     private AutoTaskStackController mAutoTaskStackController;
     @Mock
     private PanelUtils mPanelUtils;
@@ -77,6 +84,8 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
     private AutoSurfaceTransaction mAutoSurfaceTransaction;
     @Mock
     private AutoLayoutManager mAutoLayoutManager;
+    @Mock
+    private FlagManager mFlagManager;
 
     @Before
     public void setUp() {
@@ -84,7 +93,7 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
         mMainExecutor = new ShellSyncExecutor();
         mPanelTransitionCoordinator = new PanelTransitionCoordinator(
                 mAutoTaskStackController, mAutoSurfaceTransactionFactory, mPanelUtils,
-                mAutoLayoutManager, mMainExecutor);
+                mAutoLayoutManager, mMainExecutor, mFlagManager);
         when(mAutoSurfaceTransactionFactory.createTransaction(anyString())).thenReturn(
                 mAutoSurfaceTransaction);
     }
@@ -112,7 +121,7 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             animationStarted.set(mPanelTransitionCoordinator.playPendingAnimations(binder,
-                    mFinishCallback));
+                    mFinishCallback, mFinishTransaction, mInfo));
         });
 
         assertThat(animationStarted.get()).isFalse();
@@ -139,7 +148,7 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
         AtomicBoolean animationStarted = new AtomicBoolean(false);
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             animationStarted.set(mPanelTransitionCoordinator.playPendingAnimations(binder,
-                    mFinishCallback));
+                    mFinishCallback, mFinishTransaction, mInfo));
         });
 
         assertThat(animationStarted.get()).isTrue();
@@ -173,7 +182,8 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
 
         // Run the animation on the main looper
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-            mPanelTransitionCoordinator.playPendingAnimations(binder, mFinishCallback);
+            mPanelTransitionCoordinator.playPendingAnimations(binder, mFinishCallback,
+                    mFinishTransaction, mInfo);
         });
 
         mPanelTransitionCoordinator.stopRunningAnimations(binder2);
@@ -207,7 +217,8 @@ public class PanelTransitionCoordinatorTest extends CarSysuiTestCase {
 
         // Run the animation on the main looper
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
-            mPanelTransitionCoordinator.playPendingAnimations(binder, mFinishCallback);
+            mPanelTransitionCoordinator.playPendingAnimations(binder, mFinishCallback,
+                    mFinishTransaction, mInfo);
         });
 
         mPanelTransitionCoordinator.stopRunningAnimations(binder);

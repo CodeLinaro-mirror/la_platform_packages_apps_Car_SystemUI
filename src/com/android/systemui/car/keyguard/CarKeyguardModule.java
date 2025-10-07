@@ -57,8 +57,8 @@ import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.WindowManagerLockscreenVisibilityManager;
 import com.android.systemui.keyguard.WindowManagerOcclusionManager;
 import com.android.systemui.keyguard.dagger.GlanceableHubTransitionModule;
-import com.android.systemui.keyguard.dagger.KeyguardFaceAuthNotSupportedModule;
 import com.android.systemui.keyguard.dagger.KeyguardConnectedDisplaysModule;
+import com.android.systemui.keyguard.dagger.KeyguardFaceAuthNotSupportedModule;
 import com.android.systemui.keyguard.dagger.PrimaryBouncerTransitionModule;
 import com.android.systemui.keyguard.data.repository.KeyguardRepositoryModule;
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor;
@@ -87,6 +87,7 @@ import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.settings.SecureSettings;
 import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.wallpapers.WallpaperPresentationEnabled;
 import com.android.systemui.wallpapers.data.repository.WallpaperRepository;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 
@@ -97,7 +98,6 @@ import dagger.Provides;
 import dagger.multibindings.ClassKey;
 import dagger.multibindings.IntoMap;
 
-import kotlinx.coroutines.CoroutineDispatcher;
 import kotlinx.coroutines.CoroutineScope;
 
 import java.util.concurrent.Executor;
@@ -168,7 +168,7 @@ public interface CarKeyguardModule {
             SystemSettings systemSettings,
             SystemClock systemClock,
             ProcessWrapper processWrapper,
-            @Main CoroutineDispatcher mainDispatcher,
+            @Application CoroutineScope applicationScope,
             Lazy<DreamViewModel> dreamViewModel,
             Lazy<CommunalTransitionViewModel> communalTransitionViewModel,
             SystemPropertiesHelper systemPropertiesHelper,
@@ -221,7 +221,7 @@ public interface CarKeyguardModule {
                 systemSettings,
                 systemClock,
                 processWrapper,
-                mainDispatcher,
+                applicationScope,
                 dreamViewModel,
                 communalTransitionViewModel,
                 systemPropertiesHelper,
@@ -254,14 +254,15 @@ public interface CarKeyguardModule {
             ConnectedDisplayKeyguardPresentationFactory
                     connectedDisplayKeyguardPresentationFactory,
             Provider<ShadeDisplaysRepository> shadeDisplaysRepositoryProvider,
-            @Application CoroutineScope appScope) {
+            @Application CoroutineScope appScope,
+            @WallpaperPresentationEnabled boolean isWallpaperPresentationEnabled) {
         DisplayTracker finalDisplayTracker =
                 CarSystemUIUserUtil.isDriverMUMDSystemUI() ? displayTrackerImpl.get()
                         : defaultDisplayTracker;
         return new CarKeyguardDisplayManager(context, navigationBarControllerLazy,
                 finalDisplayTracker, mainExecutor, uiBgExecutor, deviceStateHelper,
                 keyguardStateController, connectedDisplayKeyguardPresentationFactory,
-                shadeDisplaysRepositoryProvider, appScope);
+                shadeDisplaysRepositoryProvider, appScope, isWallpaperPresentationEnabled);
     }
 
     /** Binds {@link KeyguardUpdateMonitor} as a {@link CoreStartable}. */

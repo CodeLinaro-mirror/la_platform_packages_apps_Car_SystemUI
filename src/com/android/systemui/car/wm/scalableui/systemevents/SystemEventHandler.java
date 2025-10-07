@@ -15,19 +15,20 @@
  */
 package com.android.systemui.car.wm.scalableui.systemevents;
 
+import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_SWITCHING;
 import static android.car.user.CarUserManager.USER_LIFECYCLE_EVENT_TYPE_UNLOCKED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 
-import static com.android.systemui.car.Flags.scalableUi;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_ENTER_SUW_EVENT_ID;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_EXIT_SUW_EVENT_ID;
-import static com.android.wm.shell.Flags.enableAutoTaskStackController;
 
 import android.car.user.CarUserManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.TypedArray;
 import android.os.Build;
+import android.os.UserManager;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -44,6 +45,8 @@ import com.android.systemui.R;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedListener;
 import com.android.systemui.car.CarServiceProvider;
+import com.android.systemui.car.flags.Flag;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Background;
@@ -71,15 +74,18 @@ public class SystemEventHandler implements CoreStartable,
     private static final boolean DEBUG = Build.IS_DEBUGGABLE;
 
     private final Context mContext;
+    private final UserManager mUserManager;
     private final CarServiceProvider mCarServiceProvider;
     private final UserTracker mUserTracker;
     private final Executor mBackgroundExecutor;
     private final CarDeviceProvisionedController mCarDeviceProvisionedController;
     private final EventDispatcher mEventDispatcher;
+    private final FlagManager mFlagManager;
 
     private CarUserManager mCarUserManager;
     private boolean mIsUserSetupInProgress;
-
+    // Flag to track if reset has already been called for this user
+    private boolean mResetCalledForUser = false;
     private int mCurrentOrientation;
 
     private final CarUserManager.UserLifecycleListener mUserLifecycleListener =
@@ -94,11 +100,28 @@ public class SystemEventHandler implements CoreStartable,
                         return;
                     }
 
-                    if (event.getEventType() == USER_LIFECYCLE_EVENT_TYPE_UNLOCKED) {
-                        if (event.getUserId() == mUserTracker.getUserId()) {
+                    if (event.getUserId() != mUserTracker.getUserId()) {
+                        Log.i(TAG, "Not current user" + event.getUserId());
+                        return;
+                    }
+
+                    if (event.getEventType() == USER_LIFECYCLE_EVENT_TYPE_SWITCHING) {
+                        // reset flag when switching
+                        mResetCalledForUser = false;
+                    } else if (event.getEventType() == USER_LIFECYCLE_EVENT_TYPE_UNLOCKED) {
+                        if (shouldResetPanels()) {
+                            Log.d(TAG, "Resetting panels during user unlock");
+                            // TODO(b/432217693): remove once visibility barrier is not home
+                            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+                            homeIntent.addCategory(Intent.CATEGORY_HOME);
+                            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            mContext.startActivityAsUser(homeIntent,
+                                    mUserTracker.getUserHandle());
+
                             StateManager.handlePanelReset();
+                            mResetCalledForUser = true;
                         } else {
-                            Log.i(TAG, "Not current user" + event.getUserId());
+                            Log.d(TAG, "Received user unlock while user is not setup");
                         }
                     } else {
                         Log.i(TAG, "Ignore system event" + event.getEventType());
@@ -108,6 +131,20 @@ public class SystemEventHandler implements CoreStartable,
 
     private final CarDeviceProvisionedListener mCarDeviceProvisionedListener =
             new CarDeviceProvisionedListener() {
+                @Override
+                public void onUserSetupChanged() {
+                    if (mUserTracker.getUserHandle().isSystem()) {
+                        // don't handle headless system user
+                        return;
+                    }
+                    if (mUserManager.isUserUnlocked(mUserTracker.getUserId())
+                            && shouldResetPanels()) {
+                        Log.d(TAG, "Resetting panels during user setup state change");
+                        StateManager.handlePanelReset();
+                        mResetCalledForUser = true;
+                    }
+                }
+
                 @Override
                 public void onUserSetupInProgressChanged() {
                     updateUserSetupState();
@@ -127,18 +164,22 @@ public class SystemEventHandler implements CoreStartable,
     @Inject
     public SystemEventHandler(
             Context context,
+            UserManager userManager,
             @Background Executor bgExecutor,
             CarServiceProvider carServiceProvider,
             UserTracker userTracker,
             CarDeviceProvisionedController carDeviceProvisionedController,
-            EventDispatcher dispatcher
+            EventDispatcher dispatcher,
+            FlagManager flagManager
     ) {
         mContext = context;
+        mUserManager = userManager;
         mBackgroundExecutor = bgExecutor;
         mCarServiceProvider = carServiceProvider;
         mUserTracker = userTracker;
         mCarDeviceProvisionedController = carDeviceProvisionedController;
         mEventDispatcher = dispatcher;
+        mFlagManager = flagManager;
         mCurrentOrientation = mContext.getResources().getConfiguration().orientation;
     }
 
@@ -151,13 +192,13 @@ public class SystemEventHandler implements CoreStartable,
     }
 
     private void notifySuwStateEvent() {
-        mEventDispatcher.executeTransaction(
+        mEventDispatcher.executeEvent(
                 mIsUserSetupInProgress ? SYSTEM_ENTER_SUW_EVENT_ID : SYSTEM_EXIT_SUW_EVENT_ID);
     }
 
     @Override
     public void start() {
-        if (isScalableUIEnabled()) {
+        if (mFlagManager.isEnabled(Flag.ScalableUIEnabled)) {
             registerUserEventListener();
             registerProvisionedStateListener();
         }
@@ -204,9 +245,8 @@ public class SystemEventHandler implements CoreStartable,
         });
     }
 
-    private boolean isScalableUIEnabled() {
-        return scalableUi()
-                && enableAutoTaskStackController()
-                && mContext.getResources().getBoolean(R.bool.config_enableScalableUI);
+    private boolean shouldResetPanels() {
+        return mCarDeviceProvisionedController.isUserSetup(mUserTracker.getUserId())
+                && !mResetCalledForUser;
     }
 }

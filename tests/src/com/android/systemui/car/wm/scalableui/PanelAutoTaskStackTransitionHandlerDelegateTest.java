@@ -16,7 +16,13 @@
 package com.android.systemui.car.wm.scalableui;
 
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_OPEN;
+
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.EMPTY_EVENT_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_HOME_EVENT_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_TASK_CLOSE_EVENT_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_TASK_OPEN_EVENT_ID;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -26,9 +32,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.os.IBinder;
 import android.view.SurfaceControl;
+import android.view.WindowManager;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
 
@@ -36,8 +44,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.systemui.CarSysuiTestCase;
+import com.android.car.scalableui.model.Event;
 import com.android.systemui.car.CarSystemUiTest;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.scalableui.panel.PanelUtils;
+import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanelInfoRepository;
 import com.android.wm.shell.automotive.AutoLayoutManager;
 import com.android.wm.shell.automotive.AutoTaskStackController;
@@ -59,6 +70,9 @@ import java.util.Map;
 @SmallTest
 public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTestCase {
 
+    private static final String TEST_PANEL_ID = "test_panel";
+    private static final String TEST_COMPONENT_NAME = "com.test/com.test.TestActivity";
+
     private PanelAutoTaskStackTransitionHandlerDelegate mDelegate;
 
     @Mock
@@ -73,6 +87,8 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
     private TaskPanelInfoRepository mTaskPanelInfoRepository;
     @Mock
     private AutoLayoutManager mAutoLayoutManager;
+    @Mock
+    private FlagManager mFlagManager;
 
     @Before
     public void setUp() {
@@ -81,7 +97,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
                 any(), any())).thenReturn(new AutoTaskStackTransaction());
         mDelegate = new PanelAutoTaskStackTransitionHandlerDelegate(mContext,
                 mAutoTaskStackController, mPanelTransitionCoordinator, mPanelUtils,
-                mTaskPanelInfoRepository, mAutoLayoutManager);
+                mTaskPanelInfoRepository, mAutoLayoutManager, mFlagManager);
     }
 
     @Test
@@ -107,7 +123,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
 
         AutoTaskStackTransaction autoTaskStackTransaction = mDelegate.handleRequest(
                 mock(IBinder.class), request);
-        assertThat(autoTaskStackTransaction).isNull();
+        assertThat(autoTaskStackTransaction).isNotNull();
     }
 
     @Test
@@ -116,7 +132,8 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
         TransitionInfo info = mock(TransitionInfo.class);
         SurfaceControl.Transaction startTransaction = mock(SurfaceControl.Transaction.class);
         SurfaceControl.Transaction finishTransaction = mock(SurfaceControl.Transaction.class);
-        when(mPanelTransitionCoordinator.playPendingAnimations(any(), any())).thenReturn(true);
+        when(mPanelTransitionCoordinator.playPendingAnimations(any(), any(), any(),
+                any())).thenReturn(true);
 
         boolean result = mDelegate.startAnimation(
                 mock(IBinder.class),
@@ -135,7 +152,8 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
         TransitionInfo info = mock(TransitionInfo.class);
         SurfaceControl.Transaction startTransaction = mock(SurfaceControl.Transaction.class);
         SurfaceControl.Transaction finishTransaction = mock(SurfaceControl.Transaction.class);
-        when(mPanelTransitionCoordinator.playPendingAnimations(any(), any())).thenReturn(false);
+        when(mPanelTransitionCoordinator.playPendingAnimations(any(), any(), any(),
+                any())).thenReturn(false);
 
         boolean result = mDelegate.startAnimation(
                 mock(IBinder.class),
@@ -169,6 +187,103 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
                 mock(IBinder.class),
                 mock(Transitions.TransitionFinishCallback.class));
 
-        verify(mPanelTransitionCoordinator).stopRunningAnimations(any());
+        verify(mPanelTransitionCoordinator).mergeAnimation(any(), any());
+    }
+
+    @Test
+    public void calculateEvent_nullTriggerTask_returnsEmptyEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        when(request.getTriggerTask()).thenReturn(null);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(EMPTY_EVENT_ID);
+        assertThat(event.getTokens()).isEmpty();
+    }
+
+    @Test
+    public void calculateEvent_homeCategoryIntent_returnsSystemHomeEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
+        taskInfo.baseIntent = new Intent();
+        taskInfo.baseIntent.addCategory(Intent.CATEGORY_HOME);
+        when(request.getType()).thenReturn(TRANSIT_OPEN);
+        when(request.getTriggerTask()).thenReturn(taskInfo);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(SYSTEM_HOME_EVENT_ID);
+    }
+
+    @Test
+    public void calculateEvent_avoidMoveToFrontFlag_returnsEmptyEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
+        taskInfo.baseIntent = new Intent();
+        when(request.getType()).thenReturn(TRANSIT_OPEN);
+        when(request.getTriggerTask()).thenReturn(taskInfo);
+        when(request.getFlags()).thenReturn(WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(EMPTY_EVENT_ID);
+        assertThat(event.getTokens()).isEmpty();
+    }
+
+    @Test
+    public void calculateEvent_openingTransition_returnsTaskOpenEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        TaskPanel panel = mock(TaskPanel.class);
+        ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
+        taskInfo.baseIntent = new Intent();
+        when(request.getType()).thenReturn(TRANSIT_OPEN);
+        when(request.getTriggerTask()).thenReturn(taskInfo);
+        ComponentName componentName = ComponentName.unflattenFromString(TEST_COMPONENT_NAME);
+        when(mPanelUtils.getTaskComponentName(taskInfo)).thenReturn(componentName);
+        when(mPanelUtils.getTaskPanel(any())).thenReturn(panel);
+        when(panel.getPanelId()).thenReturn(TEST_PANEL_ID);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(SYSTEM_TASK_OPEN_EVENT_ID);
+        assertThat(event.getPanelId()).isEqualTo(TEST_PANEL_ID);
+        assertThat(event.getTokens().get("component")).isEqualTo(TEST_COMPONENT_NAME);
+    }
+
+    @Test
+    public void calculateEvent_closingTransition_returnsTaskCloseEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        TaskPanel panel = mock(TaskPanel.class);
+        ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
+        taskInfo.baseIntent = new Intent();
+        when(request.getType()).thenReturn(TRANSIT_CLOSE);
+        when(request.getTriggerTask()).thenReturn(taskInfo);
+        ComponentName componentName = ComponentName.unflattenFromString(TEST_COMPONENT_NAME);
+        when(mPanelUtils.getTaskComponentName(taskInfo)).thenReturn(componentName);
+        when(mPanelUtils.getTaskPanel(any())).thenReturn(panel);
+        when(panel.getPanelId()).thenReturn(TEST_PANEL_ID);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(SYSTEM_TASK_CLOSE_EVENT_ID);
+        assertThat(event.getPanelId()).isEqualTo(TEST_PANEL_ID);
+        assertThat(event.getTokens().get("component")).isEqualTo(TEST_COMPONENT_NAME);
+    }
+
+    @Test
+    public void calculateEvent_noPanelAvailable_returnsEmptyEvent() {
+        TransitionRequestInfo request = mock(TransitionRequestInfo.class);
+        ActivityManager.RunningTaskInfo taskInfo = new ActivityManager.RunningTaskInfo();
+        taskInfo.baseIntent = new Intent();
+        when(request.getType()).thenReturn(TRANSIT_CLOSE);
+        when(request.getTriggerTask()).thenReturn(taskInfo);
+        ComponentName componentName = ComponentName.unflattenFromString(TEST_COMPONENT_NAME);
+        when(mPanelUtils.getTaskComponentName(taskInfo)).thenReturn(componentName);
+        when(mPanelUtils.getTaskPanel(any())).thenReturn(null);
+
+        Event event = mDelegate.calculateEvent(request);
+
+        assertThat(event.getId()).isEqualTo(EMPTY_EVENT_ID);
+        assertThat(event.getTokens()).isEmpty();
     }
 }

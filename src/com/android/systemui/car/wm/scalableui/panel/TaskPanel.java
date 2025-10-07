@@ -17,8 +17,8 @@ package com.android.systemui.car.wm.scalableui.panel;
 
 import static android.view.WindowInsets.Type.systemOverlays;
 
-import static com.android.car.scalableui.Flags.enableDecor;
-import static com.android.systemui.car.Flags.displayCompatibilityAutoDecorSafeRegion;
+import static com.android.car.scalableui.model.Restart.RESTART_POLICY_DEFAULT;
+import static com.android.car.scalableui.model.Restart.RESTART_POLICY_LAST;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_TASK_PANEL_EMPTY_EVENT_ID;
 
 import android.annotation.SuppressLint;
@@ -46,11 +46,15 @@ import com.android.car.scalableui.model.Decor;
 import com.android.car.scalableui.model.Event;
 import com.android.car.scalableui.model.PanelControllerMetadata;
 import com.android.car.scalableui.model.PanelState;
+import com.android.car.scalableui.model.Restart;
 import com.android.car.scalableui.model.Role;
 import com.android.car.scalableui.model.Variant;
 import com.android.car.scalableui.panel.Panel;
+import com.android.car.scalableui.panel.PanelUpdatePublisher;
 import com.android.car.scalableui.panel.TaskPanelController;
 import com.android.systemui.car.CarServiceProvider;
+import com.android.systemui.car.flags.Flag;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.AutoCaptionBarViewFactoryImpl;
 import com.android.systemui.car.wm.scalableui.AutoTaskStackHelper;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
@@ -78,6 +82,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -87,9 +92,11 @@ import java.util.stream.IntStream;
  */
 public final class TaskPanel extends BasePanel {
     private static final String TAG = TaskPanel.class.getSimpleName();
+    private static final long INITIAL_RETRY_DELAY_MS = 1000;
+    private static final long CHECK_RESTART_SUCCESS_DELAY_MS = 500;
+    private int mCurrentRetryCount = 0;
 
     private static final boolean DEBUG = Build.isDebuggable();
-    private static final String TASK_PANEL_TRANSACTION = ", TASK_PANEL_TRANSACTION";
 
     @NonNull
     private final AutoTaskStackController mAutoTaskStackController;
@@ -137,6 +144,8 @@ public final class TaskPanel extends BasePanel {
     private final ShellExecutor mMainExecutor;
     @NonNull
     private final AutoSurfaceTransactionFactory mAutoSurfaceTransactionFactory;
+    @NonNull
+    private final FlagManager mFlagManager;
 
     @AssistedInject
     public TaskPanel(AutoTaskStackController autoTaskStackController,
@@ -153,13 +162,16 @@ public final class TaskPanel extends BasePanel {
             AutoLayoutManager autoLayoutManager,
             @ShellMainThread ShellExecutor mainExecutor,
             AutoSurfaceTransactionFactory autoSurfaceTransactionFactory,
+            Optional<PanelUpdatePublisher> panelUpdatePublisherOptional,
+            FlagManager flagManager,
             @Assisted String id) {
-        super(context, id);
+        super(context, id, panelUpdatePublisherOptional);
         mAutoTaskStackController = autoTaskStackController;
         mCarServiceProvider = carServiceProvider;
         mAutoTaskStackHelper = autoTaskStackHelper;
         mTaskPanelInfoRepository = taskPanelInfoRepository;
         mEventDispatcher = dispatcher;
+        mFlagManager = flagManager;
         mPersistedActivities = new ArraySet<>();
         mPanelUtils = panelUtils;
         mAutoCaptionController = autoCaptionController;
@@ -202,7 +214,7 @@ public final class TaskPanel extends BasePanel {
                                     getDisplayId(),
                                     mRootTaskId);
                         }
-                        setupToolbarAndSafeRegion();
+                        setupToolbarRegion();
                         setLeash(mRootTaskStack.getLeash());
 
                         if (mPanelUtils.isUserUnlocked()) {
@@ -218,7 +230,7 @@ public final class TaskPanel extends BasePanel {
 
                     @Override
                     public void onRootTaskStackDestroyed(@NonNull RootTaskStack rootTaskStack) {
-                        mAutoCaptionController.removeSafeRegionAndCaptionRegion(rootTaskStack);
+                        mAutoCaptionController.removeCaptionRegion(rootTaskStack);
                         mRootTaskStack = null;
                         mRootTaskId = -1;
                     }
@@ -227,13 +239,17 @@ public final class TaskPanel extends BasePanel {
                     public void onTaskAppeared(ActivityManager.RunningTaskInfo taskInfo,
                             SurfaceControl leash) {
 
+                        logIfDebuggable("onTaskAppeared: " + taskInfo.taskId);
                         mTopTaskPackageName = mPanelUtils.getTaskPackageName(taskInfo);
                         if (mTopTaskPackageName == null) {
                             Log.e(TAG, "onTaskAppeared: Failed to get package name for task "
                                     + taskInfo.taskId);
                             return;
                         }
-
+                        if (mCurrentRetryCount > 0) {
+                            logIfDebuggable("onTaskAppeared: Resetting retry count.");
+                            mCurrentRetryCount = 0;
+                        }
                         mAutoTaskStackHelper.setTaskUntrimmableIfNeeded(taskInfo);
                         mTaskPanelInfoRepository.onTaskAppearedOnPanel(getPanelId(), taskInfo);
                     }
@@ -245,14 +261,67 @@ public final class TaskPanel extends BasePanel {
 
                     @Override
                     public void onTaskVanished(ActivityManager.RunningTaskInfo taskInfo) {
+                        logIfDebuggable(
+                                "onTaskVanished: " + taskInfo.taskId + " isRootTaskEmpty(): "
+                                        + isRootTaskEmpty());
                         mTaskPanelInfoRepository.onTaskVanishedOnPanel(getPanelId(), taskInfo);
                         if (isRootTaskEmpty()) {
-                            mEventDispatcher.executeTransaction(new Event.Builder(
-                                    SYSTEM_TASK_PANEL_EMPTY_EVENT_ID)
-                                    .setPanelId(getPanelId()).build());
+                            logIfDebuggable(
+                                    "onTaskVanished: Root task is empty, scheduling restart.");
+                            scheduleRestartAttempt(taskInfo);
                         }
                     }
                 });
+    }
+
+    @VisibleForTesting
+    void scheduleRestartAttempt(ActivityManager.RunningTaskInfo taskInfo) {
+        if (hasRestart()) {
+            PanelState panelState = getPanelState();
+            Restart restart = panelState.getRestart();
+            if (mCurrentRetryCount < restart.getMaxRetry()) {
+                long delay = (long) (INITIAL_RETRY_DELAY_MS * Math.pow(2, mCurrentRetryCount));
+                logIfDebuggable("scheduleRestartAttempt: Attempt " + (mCurrentRetryCount + 1)
+                        + " of " + restart.getMaxRetry() + " with delay " + delay + "ms.");
+                mMainExecutor.executeDelayed(() -> {
+                    if (restart.getPolicy().equals(RESTART_POLICY_DEFAULT)) {
+                        logIfDebuggable("scheduleRestartAttempt: Restarting with DEFAULT policy.");
+                        mContext.startActivityAsUser(getDefaultIntent(), UserHandle.CURRENT);
+                    } else if (restart.getPolicy().equals(RESTART_POLICY_LAST)) {
+                        logIfDebuggable("scheduleRestartAttempt: Restarting with LAST policy.");
+                        mContext.startActivityAsUser(taskInfo.baseIntent, UserHandle.CURRENT);
+                    }
+                    mMainExecutor.executeDelayed(() -> {
+                        if (isRootTaskEmpty()) {
+                            logIfDebuggable(
+                                    "scheduleRestartAttempt: Restart failed, trying again.");
+                            mCurrentRetryCount++;
+                            scheduleRestartAttempt(taskInfo);
+                        } else {
+                            logIfDebuggable("scheduleRestartAttempt: Restart successful.");
+                        }
+                    }, CHECK_RESTART_SUCCESS_DELAY_MS);
+                }, delay);
+            } else {
+                logIfDebuggable(
+                        "scheduleRestartAttempt: Max retries reached, sending empty event.");
+                mEventDispatcher.executeEvent(new Event.Builder(
+                        SYSTEM_TASK_PANEL_EMPTY_EVENT_ID)
+                        .setPanelId(getPanelId()).build());
+            }
+        } else {
+            logIfDebuggable("scheduleRestartAttempt: No restart policy found.");
+        }
+    }
+
+    /**
+     * Whether or not this task panel has {@link Restart} set and enabled on it.
+     * @return true if the panel has task restart enabled
+     */
+    public boolean hasRestart() {
+        PanelState panelState = getPanelState();
+        return mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart) && panelState != null
+                && panelState.getRestart() != null;
     }
 
     @Override
@@ -266,6 +335,9 @@ public final class TaskPanel extends BasePanel {
         AutoTaskStackState autoTaskStackState = new AutoTaskStackState(getBounds(), isVisible(),
                 getLayer());
         autoTaskStackTransaction.setTaskStackState(getRootStack().getId(), autoTaskStackState);
+        if (mFlagManager.isEnabled(Flag.DisplayCompatibilityAutoDecorSafeRegion)) {
+            autoTaskStackTransaction.setSafeRegionBounds(getRootStack().getId(), getSafeBounds());
+        }
         if (isVisible()) {
             setBaseIntent(autoTaskStackTransaction);
         }
@@ -285,50 +357,50 @@ public final class TaskPanel extends BasePanel {
         autoSurfaceTransaction.apply();
     }
 
+    @ShellMainThread
     private void updateDecors(@NonNull AutoSurfaceTransaction autoSurfaceTransaction,
             @Nullable Variant variant) {
         logIfDebuggable("Update " + getPanelId() + " decors, with variant" + variant);
-        if (!enableDecor()) {
+        if (!mFlagManager.isEnabled(Flag.EnableDecor)) {
             return;
         }
 
-        mMainExecutor.execute(() -> {
-            if (getRootStack() == null) {
-                return;
+        if (getRootStack() == null) {
+            return;
+        }
+
+        Map<String, Decor> decors = variant == null
+                ? getCurrentDecors()
+                : variant.getDecors();
+
+        logIfDebuggable("Update " + getPanelId() + " decors, with decors" + decors);
+
+        decors.forEach((id, decor) -> {
+            logIfDebuggable("Create decor " + id);
+            AutoDecor autoDecor = mExistingAutoDecors.getOrDefault(id,
+                    mAutoDecorManager.createAutoDecor(decor.getView(mContext),
+                            decor.getLayer(), getSafeBounds(), decor.getId()));
+            if (!mExistingAutoDecors.containsKey(id)) {
+                mAutoDecorManager.attachAutoDecorToTask(autoDecor, getRootTaskId());
+                mExistingAutoDecors.put(id, autoDecor);
             }
 
-            Map<String, Decor> decors = variant == null
-                    ? getCurrentDecors()
-                    : variant.getDecors();
-
-            logIfDebuggable("Update " + getPanelId() + " decors, with decors" + decors);
-
-            decors.forEach((id, decor) -> {
-                logIfDebuggable("Create decor " + id);
-                AutoDecor autoDecor = mExistingAutoDecors.getOrDefault(id,
-                        mAutoDecorManager.createAutoDecor(decor.getView(mContext),
-                                decor.getLayer(), getSafeBounds(), decor.getId()));
-                if (!mExistingAutoDecors.containsKey(id)) {
-                    mAutoDecorManager.attachAutoDecorToTask(autoDecor, getRootTaskId());
-                    mExistingAutoDecors.put(id, autoDecor);
-                }
-
-                updateAutoDecor(autoDecor, decor, autoSurfaceTransaction);
-            });
-
-            // Remove the AutoDecor that is no longer there.
-            Set<Map.Entry<String, AutoDecor>> decorToRemove =
-                    mExistingAutoDecors.entrySet().stream()
-                            .filter(entry -> !variant.getDecors().containsKey(entry.getKey()))
-                            .peek(entry -> {
-                                logIfDebuggable("Remove decor" + entry.getKey());
-                                mAutoDecorManager.removeAutoDecor(entry.getValue());
-                            })
-                            .collect(Collectors.toSet());
-            if (!decorToRemove.isEmpty()) {
-                decorToRemove.forEach(entry -> mExistingAutoDecors.remove(entry.getKey()));
-            }
+            updateAutoDecor(autoDecor, decor, autoSurfaceTransaction);
         });
+
+        // Remove the AutoDecor that is no longer there.
+        Set<Map.Entry<String, AutoDecor>> decorToRemove =
+                mExistingAutoDecors.entrySet().stream()
+                        .filter(entry -> decors.containsKey(entry.getKey()))
+                        .peek(entry -> {
+                            logIfDebuggable("Remove decor" + entry.getKey());
+                            mAutoDecorManager.removeAutoDecor(entry.getValue());
+                        })
+                        .collect(Collectors.toSet());
+        if (!decorToRemove.isEmpty()) {
+            decorToRemove.forEach(entry -> mExistingAutoDecors.remove(entry.getKey()));
+        }
+
     }
 
     @NonNull
@@ -350,14 +422,17 @@ public final class TaskPanel extends BasePanel {
 
     @Override
     public void refreshTheme() {
-        mExistingAutoDecors.forEach((id, autoDecor) -> {
-            mAutoDecorManager.removeAutoDecor(autoDecor);
-            mExistingAutoDecors.remove(id);
+        mMainExecutor.execute(() -> {
+            mExistingAutoDecors.forEach((id, autoDecor) -> {
+                mAutoDecorManager.removeAutoDecor(autoDecor);
+            });
+            mExistingAutoDecors.clear();
+
+            AutoSurfaceTransaction autoSurfaceTransaction = mAutoSurfaceTransactionFactory
+                    .createTransaction(REFRESH_TRANSACTION + getPanelId());
+            updateDecors(autoSurfaceTransaction, null);
+            autoSurfaceTransaction.apply();
         });
-        AutoSurfaceTransaction autoSurfaceTransaction = mAutoSurfaceTransactionFactory
-                .createTransaction(REFRESH_TRANSACTION + getPanelId());
-        updateDecors(autoSurfaceTransaction, null);
-        autoSurfaceTransaction.apply();
     }
 
     /**
@@ -456,13 +531,15 @@ public final class TaskPanel extends BasePanel {
                             + getPanelId());
         }
         mSafeBounds = safeBounds;
-        setupToolbarAndSafeRegion();
+        setupToolbarRegion();
     }
 
     @Override
-    public void setRole(@NonNull Role role) {
+    public void setRole(@Nullable Role role) {
         if (getRole() == role) return;
         super.setRole(role);
+
+        if (getRole() == null) return;
 
         if (getRole().isDefault()) {
             mIsLaunchRoot = true;
@@ -475,7 +552,6 @@ public final class TaskPanel extends BasePanel {
             }
         }
     }
-
 
     /**
      * Calculates the four rectangular areas representing the insets of this {@link TaskPanel}.
@@ -508,8 +584,8 @@ public final class TaskPanel extends BasePanel {
     }
 
     @Override
-    public void update(
-            @NonNull AutoSurfaceTransaction autoSurfaceTransaction,
+    protected void updateInternal(
+            @Nullable AutoSurfaceTransaction autoSurfaceTransaction,
             @Nullable SurfaceControl.Transaction tx,
             @Nullable Variant variant,
             boolean updateChildren) {
@@ -517,23 +593,38 @@ public final class TaskPanel extends BasePanel {
             Log.e(TAG, "RootStack is null for " + getPanelId());
             return;
         }
+        if (autoSurfaceTransaction == null && tx == null) {
+            // Both parameters being null should not be possible if the caller is properly
+            // using the update methods rather than directly calling internal method.
+            throw new IllegalArgumentException(
+                    "AutoSurfaceTransaction and SurfaceControl.Transaction cannot both be null");
+        }
+        super.updateInternal(autoSurfaceTransaction, tx, variant, updateChildren);
         logIfDebuggable(
                 "update TaskPanel:" + getPanelId() + ", updateChildren =" + updateChildren + ", "
                         + "variant" + variant);
         int taskId = getRootTaskId();
         Rect bounds = variant == null ? getBounds() : variant.getBounds();
-        autoSurfaceTransaction.setTaskSurfaceCrop(taskId,
-                new Rect(0, 0, bounds.width(), bounds.height()));
-        autoSurfaceTransaction.setTaskSurfacePosition(taskId, bounds.left,
-                bounds.top);
-        autoSurfaceTransaction.setTaskSurfaceCornerRadius(taskId,
-                variant == null ? getCornerRadius() : variant.getCornerRadius());
+        if (autoSurfaceTransaction != null) {
+            autoSurfaceTransaction.setTaskSurfaceCrop(taskId,
+                    new Rect(0, 0, bounds.width(), bounds.height()));
+            autoSurfaceTransaction.setTaskSurfacePosition(taskId, bounds.left,
+                    bounds.top);
+            autoSurfaceTransaction.setTaskSurfaceCornerRadius(taskId,
+                    variant == null ? getCornerRadius() : variant.getCornerRadius());
+        }
 
-        //TODO(b/404959846): move following to AutoSurfaceTransaction
         if (tx != null && getLeash() != null) {
+            //TODO(b/404959846): move following to AutoSurfaceTransaction
             tx.setVisibility(getLeash(), variant == null ? isVisible() : variant.isVisible());
             tx.setAlpha(getLeash(), variant == null ? getAlpha() : variant.getAlpha());
             tx.setLayer(getLeash(), variant == null ? getLayer() : variant.getLayer());
+            if (autoSurfaceTransaction == null) {
+                tx.setCrop(getLeash(), new Rect(0, 0, bounds.width(), bounds.height()));
+                tx.setPosition(getLeash(), bounds.left, bounds.top);
+                tx.setCornerRadius(getLeash(),
+                        variant == null ? getCornerRadius() : variant.getCornerRadius());
+            }
         } else {
             Log.e(TAG, "leash is " + getLeash() + ", tx is " + tx);
         }
@@ -544,7 +635,11 @@ public final class TaskPanel extends BasePanel {
                     systemOverlays(), panelInsets[sideIndex]);
         });
         if (updateChildren) {
-            updateDecors(autoSurfaceTransaction, variant);
+            // autoSurfaceTransaction being null should not be possible if the caller is properly
+            // using the update methods rather than directly calling internal method.
+            Objects.requireNonNull(autoSurfaceTransaction,
+                    "AutoSurfaceTransaction must be supplied to update child decors");
+            mMainExecutor.execute(() -> updateDecors(autoSurfaceTransaction, variant));
         }
     }
 
@@ -582,8 +677,8 @@ public final class TaskPanel extends BasePanel {
             return;
         }
 
-        if (getRole().getPersistedActivities() == null
-                || getRole().getPersistedActivities().length == 0) {
+        if (getRole() != null && (getRole().getPersistedActivities() == null
+                || getRole().getPersistedActivities().length == 0)) {
             if (DEBUG) {
                 Log.d(TAG, "Persistent Activities is empty, [" + getPanelId() + "]");
             }
@@ -615,13 +710,19 @@ public final class TaskPanel extends BasePanel {
      * @return True if mRootTaskStack is not null and the root task has zero activities, false
      * otherwise.
      */
+    @VisibleForTesting
     public boolean isRootTaskEmpty() {
         return mRootTaskStack != null
                 && mRootTaskStack.getRootTaskInfo().numActivities == 0;
     }
 
-    private void setupToolbarAndSafeRegion() {
-        if (!displayCompatibilityAutoDecorSafeRegion()) {
+    @VisibleForTesting
+    PanelState getPanelState() {
+        return StateManager.getPanelState(getPanelId());
+    }
+
+    private void setupToolbarRegion() {
+        if (!mFlagManager.isEnabled(Flag.DisplayCompatibilityAutoDecorSafeRegion)) {
             return;
         }
         if (mRootTaskStack == null) {
@@ -631,17 +732,19 @@ public final class TaskPanel extends BasePanel {
         if (mSafeBounds.isEmpty()) {
             // TODO(b/409067170): update AutoCaptionController API to be able to set these values
             //  independently
-            logVerbose("Invalid Safe Bounds, not setting safe region for panel: " + getPanelId());
+            logVerbose(
+                    "Invalid Safe Bounds, not setting toolbar region for panel: " + getPanelId());
             return;
         }
-        if (getBounds() == null || getBounds().isEmpty()) {
+        if (getBounds().isEmpty()) {
             logVerbose("Null or invalid panel bounds, not setting safe region for panel: "
                     + getPanelId());
             return;
         }
         if (mSafeBounds.equals(getBounds())) {
-            logVerbose("SafeBounds equivalent to panel bounds, not setting safe region for panel: "
-                    + getPanelId());
+            logVerbose(
+                    "SafeBounds equivalent to panel bounds, not setting toolbar region for panel: "
+                            + getPanelId());
             return;
         }
 
@@ -653,13 +756,12 @@ public final class TaskPanel extends BasePanel {
         }
         toolbarBounds.offset(-getBounds().left, -getBounds().top);
 
-        logVerbose("Setting up toolbar and safe region with following values: "
+        logVerbose("Setting up toolbar region with following values: "
                 + "rootTaskStack = " + mRootTaskStack
-                + ", safe bounds = " + mSafeBounds
                 + ", toolbar bounds = " + toolbarBounds
                 + ", panel bounds = " + getBounds());
 
-        mAutoCaptionController.setSafeRegionAndCaptionRegion(mRootTaskStack, mSafeBounds,
+        mAutoCaptionController.setCaptionRegion(mRootTaskStack,
                 toolbarBounds, mAutoCaptionBarViewFactoryImpl);
     }
 

@@ -283,9 +283,6 @@
     -->
     <bool name="config_enableClearBackStack">true</bool>
 
-    <!-- Enable the scalableUI feature. -->
-    <bool name="config_enableScalableUI">false</bool>
-
     <!-- The entry point for panel definition of scalableUI feature.  -->
     <array name="window_states">
     </array>
@@ -318,4 +315,7 @@
 
     <!-- Figma file ID for the DCF file used to load system ui -->
     <string name="config_scalableUiDcfFileId">cydzv1nh1pZBdFmZAbdFQU</string>
+
+    <!-- Whether the size compat restart button should be enabled -->
+    <bool name="config_isSizeCompatRestartButtonEnabled">false</bool>
 </resources>

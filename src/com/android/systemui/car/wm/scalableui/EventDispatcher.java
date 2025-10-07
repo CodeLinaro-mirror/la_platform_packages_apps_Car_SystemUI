@@ -15,15 +15,14 @@
  */
 package com.android.systemui.car.wm.scalableui;
 
-import static com.android.systemui.car.Flags.scalableUi;
-import static com.android.wm.shell.Flags.enableAutoTaskStackController;
-
 import android.content.Context;
 
+import com.android.car.scalableui.manager.ActionManager;
 import com.android.car.scalableui.manager.StateManager;
 import com.android.car.scalableui.model.Event;
 import com.android.car.scalableui.model.PanelTransaction;
-import com.android.systemui.R;
+import com.android.systemui.car.flags.Flag;
+import com.android.systemui.car.flags.FlagManager;
 import com.android.wm.shell.dagger.WMSingleton;
 
 import dagger.Lazy;
@@ -31,20 +30,23 @@ import dagger.Lazy;
 import javax.inject.Inject;
 
 /**
- * Class is responsible for dispatching events to the {@link StateManager} and then potentially
- * executing the resulting transaction.
+ * Class is responsible for dispatching events to the {@link StateManager} and
+ * {@link ActionManager} and then potentially executing the resulting transaction.
  */
 @WMSingleton
 public class EventDispatcher {
 
     private final Context mContext;
     private final PanelTransitionCoordinator mPanelTransitionCoordinator;
+    private final FlagManager mFlagManager;
 
     @Inject
     public EventDispatcher(Context context,
-            Lazy<PanelTransitionCoordinator> panelTransitionCoordinator) {
+            Lazy<PanelTransitionCoordinator> panelTransitionCoordinator,
+            FlagManager flagManager) {
         mContext = context;
-        if (isScalableUIEnabled()) {
+        mFlagManager = flagManager;
+        if (mFlagManager.isEnabled(Flag.ScalableUIEnabled)) {
             mPanelTransitionCoordinator = panelTransitionCoordinator.get();
         } else {
             mPanelTransitionCoordinator = null;
@@ -66,37 +68,21 @@ public class EventDispatcher {
     }
 
     /**
-     * See {@link #executeTransaction(Event)}
+     * See {@link #executeEvent(Event)}
      */
-    public void executeTransaction(String event) {
-        executeTransaction(new Event.Builder(event).build());
+    public void executeEvent(String event) {
+        executeEvent(new Event.Builder(event).build());
     }
 
     /**
-     * Retrieve a panel transaction for a given event and then immediately execute this
-     * transaction.
+     * Executes the {@link Event} by getting a linked {@link PanelTransaction} and sending
+     * an Action.
      */
-    public void executeTransaction(Event event) {
-        if (!isScalableUIEnabled()) {
+    public void executeEvent(Event event) {
+        if (!mFlagManager.isEnabled(Flag.ScalableUIEnabled)) {
             throw new IllegalStateException("ScalableUI disabled - cannot execute transaction");
         }
         mPanelTransitionCoordinator.startTransition(getTransaction(event));
-    }
-
-    private boolean isScalableUIEnabled() {
-        return scalableUi() && enableAutoTaskStackController()
-                && mContext.getResources().getBoolean(R.bool.config_enableScalableUI);
-    }
-
-    /**
-     * An interface representing an object that can produce {@link Event} and dispatch them.
-     *
-     * TODO(b/409615558): Create a broadcast receiver to receive event from other system components.
-     */
-    public interface EventProducer {
-        /**
-         * Sets the {@link EventDispatcher} that this producer should use to dispatch events.
-         */
-        void setEventDispatcher(EventDispatcher eventDispatcher);
+        ActionManager.handleEvent(mContext, event);
     }
 }

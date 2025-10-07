@@ -15,29 +15,41 @@
  */
 package com.android.systemui.car.wm.scalableui.panel.controller;
 
-import android.annotation.NonNull;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 
 import com.android.car.scalableui.model.PanelControllerMetadata;
+import com.android.car.scalableui.panel.TaskPanelController;
 import com.android.car.tos.TosHelper;
 import com.android.systemui.R;
 import com.android.systemui.car.wm.scalableui.panel.PanelUtils;
 
+import dagger.assisted.Assisted;
+import dagger.assisted.AssistedFactory;
+import dagger.assisted.AssistedInject;
+
 public final class MapsPanelController extends BaseTaskPanelController {
     private static final String TAG = MapsPanelController.class.getSimpleName();
 
-    public MapsPanelController(@NonNull Context context,
-            @NonNull PanelControllerMetadata panelControllerMetadata,
-            @NonNull PanelUtils panelUtils) {
+    @AssistedInject
+    public MapsPanelController(Context context,
+            @Assisted PanelControllerMetadata panelControllerMetadata,
+            PanelUtils panelUtils) {
         super(context, panelControllerMetadata, panelUtils);
+    }
+
+    /** Creates an instance of MapsPanelController using the provided PanelControllerMetadata. */
+    @AssistedFactory
+    public interface Factory extends TaskPanelController.Factory<MapsPanelController> {
+        MapsPanelController create(PanelControllerMetadata metadata);
     }
 
     @Override
     public Intent getDefaultComponent() {
         Intent mapIntent = super.getDefaultComponent();
         Intent result = TosHelper.maybeReplaceWithTosMapIntent(mContext, mapIntent,
-                R.string.config_tosMapIntent);
+                R.string.config_tosMapIntent, ActivityManager.getCurrentUser());
         logIfDebuggable(TAG + ", getDefaultComponent =  " + result);
         return result;
     }
