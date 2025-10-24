@@ -16,12 +16,18 @@
 
 package com.android.systemui.wmshell;
 
+import static com.android.car.scalableui.loader.xml.HunTagXmlParserKt.HUN_PANEL_ID;
+
 import android.content.Context;
+import android.hardware.display.DisplayManager;
 import android.os.Handler;
+import android.util.Log;
 import android.view.IWindowManager;
 
 import androidx.annotation.NonNull;
 
+import com.android.car.scalableui.manager.StateManager;
+import com.android.car.scalableui.model.PanelState;
 import com.android.car.scalableui.panel.PanelUpdatePublisher;
 import com.android.systemui.car.CarServiceProvider;
 import com.android.systemui.car.flags.Flag;
@@ -29,6 +35,7 @@ import com.android.systemui.car.flags.FlagManager;
 import com.android.systemui.car.wm.AutoCaptionPerDisplayInitializer;
 import com.android.systemui.car.wm.AutoDisplayCompatWindowDecorViewModel;
 import com.android.systemui.car.wm.CarFullscreenTaskMonitorListener;
+import com.android.systemui.car.wm.CarWMUserHelper;
 import com.android.systemui.car.wm.scalableui.ActionConfigReader;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
 import com.android.systemui.car.wm.scalableui.PanelAutoTaskStackTransitionHandlerDelegate;
@@ -54,15 +61,7 @@ import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayInsetsController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
-import com.android.wm.shell.compatui.letterbox.DelegateLetterboxTransitionObserver;
-import com.android.wm.shell.compatui.letterbox.LetterboxCommandHandler;
-import com.android.wm.shell.compatui.letterbox.config.IgnoreLetterboxDependenciesHelper;
-import com.android.wm.shell.compatui.letterbox.config.LetterboxDependenciesHelper;
-import com.android.wm.shell.compatui.letterbox.lifecycle.LetterboxCleanupAdapter;
-import com.android.wm.shell.compatui.letterbox.state.LetterboxTaskListenerAdapter;
 import com.android.wm.shell.dagger.DynamicOverride;
-import com.android.wm.shell.dagger.LetterboxModule;
-import com.android.wm.shell.dagger.ShellCreateTriggerOverride;
 import com.android.wm.shell.dagger.WMShellBaseModule;
 import com.android.wm.shell.dagger.WMSingleton;
 import com.android.wm.shell.fullscreen.FullscreenTaskListener;
@@ -70,6 +69,7 @@ import com.android.wm.shell.pip.Pip;
 import com.android.wm.shell.recents.RecentTasksController;
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.taskview.TaskViewTransitions;
 import com.android.wm.shell.transition.FocusTransitionObserver;
@@ -89,18 +89,19 @@ import kotlinx.coroutines.CoroutineScope;
 import java.util.Optional;
 
 /** Provides dependencies from {@link com.android.wm.shell} for CarSystemUI. */
-@Module(includes = {WMShellBaseModule.class, AutoShellModule.class, LetterboxModule.class,
-        PanelControllerModule.class})
+@Module(includes = {WMShellBaseModule.class, AutoShellModule.class, PanelControllerModule.class})
 public abstract class CarWMShellModule {
+    private static final String TAG = CarWMShellModule.class.getSimpleName();
 
     @WMSingleton
     @Provides
     static DisplaySystemBarsController provideDisplaySystemBarsController(Context context,
             IWindowManager wmService, DisplayController displayController,
             DisplayInsetsController displayInsetsController,
-            @Main Handler mainHandler) {
+            @Main Handler mainHandler, CarWMUserHelper userHelper,
+            ShellController shellController) {
         return new DisplaySystemBarsController(context, wmService, displayController,
-                displayInsetsController, mainHandler);
+                displayInsetsController, mainHandler, userHelper, shellController);
     }
 
     @WMSingleton
@@ -270,30 +271,20 @@ public abstract class CarWMShellModule {
     }
 
     @WMSingleton
-    @ShellCreateTriggerOverride
     @Provides
-    static Object provideIndependentShellComponentsToCreate(
-            @NonNull DelegateLetterboxTransitionObserver letterboxTransitionObserver,
-            @NonNull LetterboxCommandHandler letterboxCommandHandler,
-            @NonNull LetterboxTaskListenerAdapter letterboxTaskListenerAdapter,
-            @NonNull LetterboxCleanupAdapter letterboxCleanupAdapter) {
-        return new Object();
-    }
-
-    @WMSingleton
-    @Provides
-    static LetterboxDependenciesHelper provideLetterboxDependenciesHelper() {
-        return new IgnoreLetterboxDependenciesHelper();
-    }
-
-    @WMSingleton
-    @Provides
-    static Optional<HunWindow> provideHunWindow(Context context,
+    static Optional<HunWindow> provideHunWindow(Context context, DisplayManager displayManager,
             Optional<PanelUpdateConsumer> consumer, EventDispatcher dispatcher) {
         if (consumer.isPresent()) {
+            PanelState panelState = StateManager.getPanelState(HUN_PANEL_ID);
+            if (panelState == null) {
+                Log.w(TAG, "HunWindow not initialized because PanelState for HUN_PANEL_ID "
+                        + "is null.");
+                return Optional.empty();
+            }
             try {
                 return Optional.of(
-                        new HunWindow(context, consumer.get(), dispatcher));
+                        new HunWindow(context, displayManager, consumer.get(), dispatcher,
+                                panelState.getDisplayId()));
             } catch (IllegalStateException e) {
                 return Optional.empty();
             }
