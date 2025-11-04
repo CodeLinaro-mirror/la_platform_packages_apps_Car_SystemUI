@@ -31,8 +31,10 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
+import android.os.UserHandle;
 import android.util.Log;
 
+import androidx.annotation.CallSuper;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
@@ -69,6 +71,8 @@ public class BaseTaskPanelController implements TaskPanelController {
     @NonNull
     private final Object mLock = new Object();
     @NonNull
+    private final String mPanelId;
+    @NonNull
     private final PanelControllerMetadata mPanelControllerMetadata;
     @NonNull
     private final Set<ComponentName> mPersistentActivities;
@@ -90,27 +94,30 @@ public class BaseTaskPanelController implements TaskPanelController {
      *                                containing configuration information.
      */
     @AssistedInject
-    public BaseTaskPanelController(@NonNull Context context,
+    public BaseTaskPanelController(@NonNull Context context, @Assisted String panelId,
             @NonNull @Assisted PanelControllerMetadata panelControllerMetadata,
             @NonNull PanelUtils panelUtils) {
         mContext = context;
+        mPanelId = panelId;
         mPanelControllerMetadata = panelControllerMetadata;
         mPersistentActivities = new HashSet<>();
         mPanelUtils = panelUtils;
-        init(panelControllerMetadata);
     }
 
-    /**
-     * Creates an instance of BaseTaskPanelController using the provided PanelControllerMetadata.
-     */
     @AssistedFactory
     public interface Factory extends TaskPanelController.Factory<BaseTaskPanelController> {
-        BaseTaskPanelController create(PanelControllerMetadata metadata);
+        /**
+         * Creates an instance of BaseTaskPanelController using the provided
+         * PanelControllerMetadata.
+         */
+        BaseTaskPanelController create(String panelId, PanelControllerMetadata metadata);
     }
 
-    private void init(PanelControllerMetadata metadata) {
-        mDefaultComponent = parseDefaultComponent(metadata);
-        mUpdateFilter = parseUpdateFilter(metadata);
+    @Override
+    @CallSuper
+    public void init() {
+        mDefaultComponent = parseDefaultComponent(mPanelControllerMetadata);
+        mUpdateFilter = parseUpdateFilter(mPanelControllerMetadata);
         if (mUpdateFilter != null) {
             registerApplicationInstallUninstallReceiver();
         }
@@ -136,13 +143,21 @@ public class BaseTaskPanelController implements TaskPanelController {
         filter.addAction(Intent.ACTION_PACKAGE_ADDED);
         filter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         filter.addAction(Intent.ACTION_PACKAGE_CHANGED);
+        filter.addAction(Intent.ACTION_PACKAGE_REPLACED);
         filter.addDataScheme(PACKAGE_DATA_SCHEME);
-        mContext.registerReceiver(new BroadcastReceiver() {
+        BroadcastReceiver mAppsUpdateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 updatePersistentActivities();
             }
-        }, filter, Context.RECEIVER_EXPORTED);
+        };
+        mContext.registerReceiverAsUser(
+                mAppsUpdateReceiver,
+                UserHandle.ALL, // Necessary because CarSystemUi lives in User 0
+                filter,
+                /* broadcastPermission= */ null,
+                /* scheduler= */ null,
+                Context.RECEIVER_EXPORTED);
     }
 
     @SuppressLint("MissingPermission")
@@ -175,6 +190,11 @@ public class BaseTaskPanelController implements TaskPanelController {
                 mTaskPanelHandler.onApplicationChanged();
             }
         }
+    }
+
+    @NonNull
+    protected String getPanelId() {
+        return mPanelId;
     }
 
     protected void logIfDebuggable(String s) {
