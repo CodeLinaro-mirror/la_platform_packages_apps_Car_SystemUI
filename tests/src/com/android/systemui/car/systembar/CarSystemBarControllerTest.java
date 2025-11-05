@@ -63,10 +63,10 @@ import com.android.systemui.R;
 import com.android.systemui.SysuiTestableContext;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarSystemUiTest;
-import com.android.systemui.car.systembar.element.CarSystemBarElementController;
+import com.android.systemui.car.flexibleui.CarSystemBarElementController;
+import com.android.systemui.car.flexibleui.CarSystemBarElementStateController;
+import com.android.systemui.car.flexibleui.CarSystemBarElementStatusBarDisableController;
 import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
-import com.android.systemui.car.systembar.element.CarSystemBarElementStateController;
-import com.android.systemui.car.systembar.element.CarSystemBarElementStatusBarDisableController;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.car.window.OverlayVisibilityMediator;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
@@ -222,7 +222,9 @@ public class CarSystemBarControllerTest extends CarSysuiTestCase {
         controllerFactoryMap.put(PassengerHomeButtonController.class,
                 passengerHomeButtonControllerProvider);
         CarSystemBarElementInitializer carSystemBarElementInitializer =
-                new CarSystemBarElementInitializer(controllerFactoryMap);
+                new CarSystemBarElementInitializer(controllerFactoryMap,
+                        mock(CarSystemBarElementStateController.class),
+                        mock(CarSystemBarRestartTracker.class));
         when(mWindowManager.getCurrentWindowMetrics()).thenReturn(mWindowMetrics);
         when(mWindowMetrics.getBounds()).thenReturn(new Rect(0, 0, 1920, 1080));
         mSystemBarConfigs = new SystemBarConfigsImpl(mSpiedContext,
