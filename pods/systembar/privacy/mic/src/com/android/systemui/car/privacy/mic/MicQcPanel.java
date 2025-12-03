@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,28 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.systemui.car.privacy;
+package com.android.systemui.car.systembar.privacy.mic;
 
 import android.content.Context;
 
 import androidx.annotation.DrawableRes;
 
 import com.android.car.qc.provider.BaseLocalQCProvider;
-import com.android.systemui.R;
+import com.android.systemui.car.privacy.SensorQcPanel;
 
 import javax.inject.Inject;
 
 /**
- * A {@link BaseLocalQCProvider} that builds the camera privacy panel.
+ * A {@link BaseLocalQCProvider} that builds the microphone privacy panel.
  */
-public class CameraQcPanel extends SensorQcPanel {
+public class MicQcPanel extends SensorQcPanel {
 
-    private static final String SENSOR_NAME = "camera";
-    private static final String SENSOR_SHORT_NAME = "camera";
-    private static final String SENSOR_NAME_WITH_FIRST_LETTER_CAPITALIZED = "Camera";
+    private static final String SENSOR_NAME = "microphone";
+    private static final String SENSOR_SHORT_NAME = "mic";
+    private static final String SENSOR_NAME_WITH_FIRST_LETTER_CAPITALIZED = "Microphone";
 
     @Inject
-    public CameraQcPanel(Context context, CameraSensorPrivacyInfoProvider infoProvider) {
+    public MicQcPanel(Context context, MicSensorPrivacyInfoProvider infoProvider) {
         super(context, infoProvider);
     }
 
@@ -55,11 +55,11 @@ public class CameraQcPanel extends SensorQcPanel {
 
     @Override
     protected @DrawableRes int getSensorOnIconResourceId() {
-        return R.drawable.ic_camera_light;
+        return R.drawable.ic_mic_light;
     }
 
     @Override
     protected @DrawableRes int getSensorOffIconResourceId() {
-        return R.drawable.ic_camera_off_light;
+        return R.drawable.ic_mic_off_light;
     }
 }

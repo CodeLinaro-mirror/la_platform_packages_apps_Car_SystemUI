@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.android.systemui.car.privacy;
+package com.android.systemui.car.systembar.privacy.camera;
 
-import static android.hardware.SensorPrivacyManager.Sensors.MICROPHONE;
+import static android.hardware.SensorPrivacyManager.Sensors.CAMERA;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.hardware.SensorPrivacyManager;
 import android.permission.PermissionManager;
 
+import com.android.systemui.car.privacy.SensorPrivacyInfoProvider;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.privacy.PrivacyItemController;
 import com.android.systemui.privacy.PrivacyType;
@@ -32,12 +33,12 @@ import javax.inject.Inject;
 
 /**
  * Implementation of {@link
- * com.android.systemui.car.privacy.SensorPrivacyInfoProvider} for microphone.
+ * com.android.systemui.car.privacy.SensorPrivacyInfoProvider} for camera.
  */
 @SysUISingleton
-public class MicSensorPrivacyInfoProvider extends SensorPrivacyInfoProvider {
+public class CameraSensorPrivacyInfoProvider extends SensorPrivacyInfoProvider {
     @Inject
-    public MicSensorPrivacyInfoProvider(Context context,
+    public CameraSensorPrivacyInfoProvider(Context context,
             PermissionManager permissionManager,
             PackageManager packageManager,
             SensorPrivacyManager sensorPrivacyManager,
@@ -51,11 +52,11 @@ public class MicSensorPrivacyInfoProvider extends SensorPrivacyInfoProvider {
 
     @Override
     protected PrivacyType getProviderPrivacyType() {
-        return PrivacyType.TYPE_MICROPHONE;
+        return PrivacyType.TYPE_CAMERA;
     }
 
     @Override
     protected int getChipSensor() {
-        return MICROPHONE;
+        return CAMERA;
     }
 }

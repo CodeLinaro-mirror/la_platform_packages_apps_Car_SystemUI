@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.systemui.car.privacy;
+package com.android.systemui.car.systembar.privacy.mic;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -56,21 +56,21 @@ import java.util.List;
 @RunWith(AndroidTestingRunner.class)
 @TestableLooper.RunWithLooper
 @SmallTest
-public class CameraQcPanelTest extends CarSysuiTestCase {
+public class MicQcPanelTest extends CarSysuiTestCase {
     private static final String APP_LABEL_ACTIVE = "active";
     private static final String APP_LABEL_INACTIVE = "inactive";
     private static final String PACKAGE_NAME = "package";
 
-    private CameraQcPanel mCameraQcPanel;
+    private MicQcPanel mMicQcPanel;
     private String mPhoneCallTitle;
-    private String mCameraOnTitleText;
-    private String mCameraOffTitleText;
+    private String mMicOnTitleText;
+    private String mMicOffTitleText;
     private Drawable mTestDrawable;
 
     @Mock
     private Context mUserContext;
     @Mock
-    private CameraSensorPrivacyInfoProvider mCameraSensorInfoProvider;
+    private MicSensorPrivacyInfoProvider mMicSensorInfoProvider;
     @Mock
     private PackageManager mPackageManager;
     @Mock
@@ -86,61 +86,61 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
         mContext.prepareCreateContextAsUser(UserHandle.SYSTEM, mUserContext);
         when(mUserContext.getPackageManager()).thenReturn(mPackageManager);
 
-        mCameraQcPanel = new CameraQcPanel(mContext, mCameraSensorInfoProvider);
+        mMicQcPanel = new MicQcPanel(mContext, mMicSensorInfoProvider);
 
         mPhoneCallTitle = mContext.getString(R.string.ongoing_privacy_dialog_phonecall);
-        mCameraOnTitleText = mContext.getString(R.string.privacy_chip_use_sensor,
-                mCameraQcPanel.getSensorName());
-        mCameraOffTitleText = mContext.getString(R.string.privacy_chip_off_content,
-                mCameraQcPanel.getSensorNameWithFirstLetterCapitalized());
+        mMicOnTitleText = mContext.getString(R.string.privacy_chip_use_sensor,
+                mMicQcPanel.getSensorName());
+        mMicOffTitleText = mContext.getString(R.string.privacy_chip_off_content,
+                mMicQcPanel.getSensorNameWithFirstLetterCapitalized());
         mTestDrawable = mContext.getDrawable(R.drawable.privacy_chip_active_background_pill);
     }
 
     @Test
-    public void testGetQCItem_cameraDisabled_noPrivacyItems_returnsOnlyCameraOffRow() {
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(false);
+    public void testGetQCItem_micDisabled_noPrivacyItems_returnsOnlyMicMutedRow() {
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(false);
         List<PrivacyDialog.PrivacyElement> elements = Collections.emptyList();
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
         assertThat(list.getRows().size()).isEqualTo(1);
-        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mCameraOffTitleText);
+        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mMicOffTitleText);
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_noPrivacyItems_returnsOnlyCameraOffRow() {
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+    public void testGetQCItem_micEnabled_noPrivacyItems_returnsOnlyMicMutedRow() {
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements = Collections.emptyList();
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
         assertThat(list.getRows().size()).isEqualTo(1);
-        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mCameraOnTitleText);
+        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mMicOnTitleText);
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_onlyOneActivePrivacyItem_firstRowCameraEnabled() {
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+    public void testGetQCItem_micEnabled_onlyOneActivePrivacyItem_firstRowMicEnabled() {
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements =
                 List.of(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
         assertThat(list.getRows().size()).isEqualTo(2);
-        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mCameraOnTitleText);
+        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mMicOnTitleText);
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_onlyOneActivePrivacyItem_secondRowActiveApp() {
+    public void testGetQCItem_micEnabled_onlyOneActivePrivacyItem_secondRowActiveApp() {
         String expectedTitle = mContext.getString(R.string.privacy_chip_app_using_sensor_suffix,
-                APP_LABEL_ACTIVE, mCameraQcPanel.getSensorShortName());
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+                APP_LABEL_ACTIVE, mMicQcPanel.getSensorShortName());
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements =
                 List.of(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
@@ -149,29 +149,27 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
     }
 
     @Test
-    public void
-            testGetQCItem_cameraDisabled_onlyOneInactivePhonePrivacyItem_firstRowCameraDisabled() {
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(false);
+    public void testGetQCItem_micDisabled_onlyOneInactivePhonePrivacyItem_firstRowMicDisabled() {
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(false);
         List<PrivacyDialog.PrivacyElement> elements =
                 List.of(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
         assertThat(list.getRows().size()).isEqualTo(2);
-        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mCameraOffTitleText);
+        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mMicOffTitleText);
     }
 
     @Test
-    public void
-            testGetQCItem_cameraDisabled_onlyOneInactivePhonePrivacyItem_secondRowInactiveApp() {
+    public void testGetQCItem_micDisabled_onlyOneInactivePhonePrivacyItem_secondRowInactiveApp() {
         String expectedTitle =
                 mContext.getString(R.string.privacy_chip_app_recently_used_sensor_suffix,
-                        mPhoneCallTitle, mCameraQcPanel.getSensorShortName());
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(false);
+                        mPhoneCallTitle, mMicQcPanel.getSensorShortName());
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(false);
         List<PrivacyDialog.PrivacyElement> elements =
                 List.of(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
+        when(mMicSensorInfoProvider.getPrivacyElements()).thenReturn(elements);
 
         QCList list = getQCList();
 
@@ -180,35 +178,35 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_multiplePrivacyItems_firstRowCameraEnabled() {
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+    public void testGetQCItem_micEnabled_multiplePrivacyItems_firstRowMicEnabled() {
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements = new ArrayList<>();
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements())
+        when(mMicSensorInfoProvider.getPrivacyElements())
                 .thenReturn(elements);
 
         QCList list = getQCList();
 
         assertThat(list.getRows().size()).isEqualTo(4);
-        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mCameraOnTitleText);
+        assertThat(list.getRows().get(0).getTitle()).isEqualTo(mMicOnTitleText);
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_multiplePrivacyItems_secondRowActiveApp() {
+    public void testGetQCItem_micEnabled_multiplePrivacyItems_secondRowActiveApp() {
         String expectedTitle = mContext.getString(R.string.privacy_chip_app_using_sensor_suffix,
-                APP_LABEL_ACTIVE, mCameraQcPanel.getSensorShortName());
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+                APP_LABEL_ACTIVE, mMicQcPanel.getSensorShortName());
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements = new ArrayList<>();
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements())
+        when(mMicSensorInfoProvider.getPrivacyElements())
                 .thenReturn(elements);
 
         QCList list = getQCList();
@@ -218,17 +216,17 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_multiplePrivacyItems_thirdRowActivePhone() {
+    public void testGetQCItem_micEnabled_multiplePrivacyItems_thirdRowActivePhone() {
         String expectedTitle = mContext.getString(R.string.privacy_chip_app_using_sensor_suffix,
-                mPhoneCallTitle, mCameraQcPanel.getSensorShortName());
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+                mPhoneCallTitle, mMicQcPanel.getSensorShortName());
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements = new ArrayList<>();
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements())
+        when(mMicSensorInfoProvider.getPrivacyElements())
                 .thenReturn(elements);
 
         QCList list = getQCList();
@@ -238,18 +236,18 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
     }
 
     @Test
-    public void testGetQCItem_cameraEnabled_multiplePrivacyItems_fourthRowInactiveApps() {
+    public void testGetQCItem_micEnabled_multiplePrivacyItems_fourthRowInactiveApps() {
         String expectedTitle = mContext
                 .getString(R.string.privacy_chip_apps_recently_used_sensor_suffix,
-                        mPhoneCallTitle, 2, mCameraQcPanel.getSensorShortName());
-        when(mCameraSensorInfoProvider.isSensorEnabled()).thenReturn(true);
+                        mPhoneCallTitle, 2, mMicQcPanel.getSensorShortName());
+        when(mMicSensorInfoProvider.isSensorEnabled()).thenReturn(true);
         List<PrivacyDialog.PrivacyElement> elements = new ArrayList<>();
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ true));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ false, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ false));
         elements.add(getPrivacyElement(/* active=*/ true, /* phoneCall= */ true));
-        when(mCameraSensorInfoProvider.getPrivacyElements())
+        when(mMicSensorInfoProvider.getPrivacyElements())
                 .thenReturn(elements);
 
         QCList list = getQCList();
@@ -259,7 +257,7 @@ public class CameraQcPanelTest extends CarSysuiTestCase {
     }
 
     private QCList getQCList() {
-        QCItem item = mCameraQcPanel.getQCItem();
+        QCItem item = mMicQcPanel.getQCItem();
         assertThat(item).isNotNull();
         assertThat(item instanceof QCList).isTrue();
         return (QCList) item;
