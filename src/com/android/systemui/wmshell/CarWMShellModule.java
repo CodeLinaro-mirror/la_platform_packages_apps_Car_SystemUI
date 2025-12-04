@@ -37,18 +37,21 @@ import com.android.systemui.car.wm.AutoDisplayCompatWindowDecorViewModel;
 import com.android.systemui.car.wm.CarFullscreenTaskMonitorListener;
 import com.android.systemui.car.wm.CarWMUserHelper;
 import com.android.systemui.car.wm.scalableui.ActionConfigReader;
+import com.android.systemui.car.wm.scalableui.AutoTaskStackHelper;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
 import com.android.systemui.car.wm.scalableui.PanelAutoTaskStackTransitionHandlerDelegate;
 import com.android.systemui.car.wm.scalableui.PanelConfigReader;
 import com.android.systemui.car.wm.scalableui.ScalableUIDumpsys;
+import com.android.systemui.car.wm.scalableui.ScalableUIUtils;
 import com.android.systemui.car.wm.scalableui.ScalableUIWMInitializer;
-import com.android.systemui.car.wm.scalableui.panel.BasePanel;
 import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
+import com.android.systemui.car.wm.scalableui.panel.SysUIPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.systemui.car.wm.scalableui.panel.controller.PanelControllerModule;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.PanelUpdateConsumer;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.ScalableUIPanelUpdateImpl;
 import com.android.systemui.car.wm.scalableui.systemwindow.HunWindow;
+import com.android.systemui.car.wm.scalableui.systemwindow.SystemUiWindowProvider;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.wm.DisplaySystemBarsController;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
@@ -99,9 +102,11 @@ public abstract class CarWMShellModule {
             IWindowManager wmService, DisplayController displayController,
             DisplayInsetsController displayInsetsController,
             @Main Handler mainHandler, CarWMUserHelper userHelper,
-            ShellController shellController) {
+            ShellController shellController, SystemUiWindowProvider windowProvider,
+            EventDispatcher dispatcher) {
         return new DisplaySystemBarsController(context, wmService, displayController,
-                displayInsetsController, mainHandler, userHelper, shellController);
+                displayInsetsController, mainHandler, userHelper, shellController, windowProvider,
+                dispatcher);
     }
 
     @WMSingleton
@@ -191,15 +196,15 @@ public abstract class CarWMShellModule {
             Context context,
             TaskPanel.Factory taskPanelFactory,
             DecorPanel.Factory decorPanelFactory,
-            BasePanel.Factory basePanelFactory,
+            SysUIPanel.Factory sysUiPanelFactory,
             FlagManager flagManager
     ) {
-        if (flagManager.isEnabled(Flag.ScalableUIEnabled)) {
+        if (ScalableUIUtils.isScalableUIEnabled(context, flagManager)) {
             return Optional.of(new PanelConfigReader(
                     context,
                     taskPanelFactory,
                     decorPanelFactory,
-                    basePanelFactory,
+                    sysUiPanelFactory,
                     flagManager));
         }
         return Optional.empty();
@@ -209,7 +214,7 @@ public abstract class CarWMShellModule {
     @Provides
     static Optional<ActionConfigReader> providesActionConfigReader(Context context,
             FlagManager flagManager) {
-        if (flagManager.isEnabled(Flag.ScalableUIEnabled)) {
+        if (ScalableUIUtils.isScalableUIEnabled(context, flagManager)) {
             return Optional.of(new ActionConfigReader(context, flagManager));
         }
         return Optional.empty();
@@ -223,12 +228,16 @@ public abstract class CarWMShellModule {
             Optional<PanelConfigReader> panelConfigReaderOptional,
             Lazy<PanelAutoTaskStackTransitionHandlerDelegate> delegate,
             ScalableUIDumpsys scalableUIDumpsys,
-            FlagManager flagManager) {
-        if (flagManager.isEnabled(Flag.ScalableUIEnabled)
+            FlagManager flagManager,
+            DisplayController displayController,
+            AutoTaskStackHelper autoTaskStackHelper) {
+        if (ScalableUIUtils.isScalableUIEnabled(context, flagManager)
                 && panelConfigReaderOptional.isPresent()) {
             return Optional.of(
-                    new ScalableUIWMInitializer(shellInit, actionConfigReaderOptional.get(),
-                            panelConfigReaderOptional.get(), delegate.get(), scalableUIDumpsys));
+                    new ScalableUIWMInitializer(context, shellInit,
+                            actionConfigReaderOptional.get(),
+                            panelConfigReaderOptional.get(), delegate.get(), scalableUIDumpsys,
+                            displayController, autoTaskStackHelper, flagManager));
         }
         return Optional.empty();
     }
@@ -241,9 +250,9 @@ public abstract class CarWMShellModule {
 
     @WMSingleton
     @Provides
-    static Optional<ScalableUIPanelUpdateImpl> provideScalableUIPanelUpdateImpl(
+    static Optional<ScalableUIPanelUpdateImpl> provideScalableUIPanelUpdateImpl(Context context,
             FlagManager flagManager) {
-        if (flagManager.isEnabled(Flag.ScalableUIEnabled) && flagManager.isEnabled(
+        if (ScalableUIUtils.isScalableUIEnabled(context, flagManager) && flagManager.isEnabled(
                 Flag.EnableExtPanelUpdates)) {
             return Optional.of(new ScalableUIPanelUpdateImpl());
         }

@@ -35,14 +35,16 @@ public class SystemEventConstants {
      * - Keyguard is not showing
      * The event will include the userSwitch token with "true" or "false" depending on if this
      * user is newly being switched to or not.
+     * Note: It's not recommended to consume both the KEYGUARD_HIDDEN_EVENT and this event in
+     * the defined panel transitions since they may be executed close together.
      */
     public static final String SYSTEM_USER_AUTHENTICATED_EVENT_ID = "_System_UserAuthenticated";
     public static final String SYSTEM_USER_SWITCH_ON_AUTHENTICATED_TOKEN_ID = "userSwitch";
     public static final String SYSTEM_ON_ANIMATION_END_EVENT_ID = "_System_OnAnimationEndEvent";
     public static final String SYSTEM_ENTER_IMMERSIVE_EVENT_ID = "_System_EnterImmersiveMode";
     public static final String SYSTEM_EXIT_IMMERSIVE_EVENT_ID = "_System_ExitImmersiveMode";
-    public static final String HIDE_EVENT_PREFIX = "_System_Hide";
-    public static final String SHOW_EVENT_PREFIX = "_System_Show";
+    public static final String SYSTEM_SHOW_PANEL_EVENT_ID = "_System_Show_Panel";
+    public static final String SYSTEM_HIDE_PANEL_EVENT_ID = "_System_Hide_Panel";
 
     /**
      * Represents the variant at the end of the animation.

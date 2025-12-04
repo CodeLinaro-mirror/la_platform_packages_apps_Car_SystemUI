@@ -24,10 +24,11 @@ import android.util.Log
 import android.view.Display
 import android.view.View
 import android.view.WindowManager
+import com.android.car.scalableui.model.Event
 import com.android.systemui.car.wm.scalableui.EventDispatcher
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.PanelUpdateConsumer
-import com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.HIDE_EVENT_PREFIX
-import com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SHOW_EVENT_PREFIX
+import com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_HIDE_PANEL_EVENT_ID
+import com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_SHOW_PANEL_EVENT_ID
 
 /**
  * A base class for [SystemUiWindow] implementations, providing common functionality.
@@ -38,28 +39,41 @@ abstract class SystemUiWindowBase(
     protected val panelUpdateConsumer: PanelUpdateConsumer,
     protected val eventDispatcher: EventDispatcher,
     protected var id: String,
-    protected val displayId: Int
-
+    private val displayId: Int
 ) : SystemUiWindow {
     protected var display: Display? = null
     protected var displayContext: Context? = null
     protected var windowManager: WindowManager? = null
     protected var displayMetrics: DisplayMetrics? = null
     protected var _rootView: View? = null
+    private val panelUpdateCallback: PanelUpdateConsumer.PanelUpdateCallback
 
     init {
         initializeDisplay()
-        windowManager?.let { wm ->
-            panelUpdateConsumer.registerCallback(id, object :
-                PanelUpdateConsumer.PanelUpdateCallback {
-                override fun onBoundsChange(panelId: String, bounds: Rect) {
-                    _rootView?.let {
-                        wm.updateViewLayout(it, getLayoutParams())
-                    }
+        panelUpdateCallback = object : PanelUpdateConsumer.PanelUpdateCallback {
+            override fun onBoundsChange(panelId: String, bounds: Rect) {
+                _rootView?.let {
+                    windowManager?.updateViewLayout(it, getLayoutParams())
                 }
-            })
-        } ?: run {
-            Log.e(TAG, "Window manager is null, cannot register panel update callback for $id")
+            }
+
+            override fun onInsetsChange(panelId: String, insets: Insets) {
+                _rootView?.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+            }
+
+            override fun onAlphaChange(panelId: String, alpha: Float) {
+                _rootView?.alpha = alpha
+            }
+
+            override fun onVisibilityChange(panelId: String, visible: Boolean) {
+                _rootView?.visibility = if (visible) View.VISIBLE else View.GONE
+            }
+
+            override fun onGravityChange(panelId: String, gravity: Int) {
+                _rootView?.let {
+                    windowManager?.updateViewLayout(it, getLayoutParams())
+                }
+            }
         }
     }
 
@@ -86,6 +100,7 @@ abstract class SystemUiWindowBase(
             return
         }
     }
+
     override fun getName(): String = id
 
     override fun getBounds(): Rect? {
@@ -98,6 +113,7 @@ abstract class SystemUiWindowBase(
         }
         this._rootView = view
         windowManager?.addView(this._rootView, layoutParams)
+        panelUpdateConsumer.registerCallback(id, panelUpdateCallback)
     }
 
     override fun removeRootView() {
@@ -105,6 +121,7 @@ abstract class SystemUiWindowBase(
             windowManager?.removeView(it)
             _rootView = null
         }
+        panelUpdateConsumer.unregisterCallback(id, panelUpdateCallback)
     }
 
     override fun removeRootViewImmediate() {
@@ -112,6 +129,7 @@ abstract class SystemUiWindowBase(
             windowManager?.removeViewImmediate(it)
             _rootView = null
         }
+        panelUpdateConsumer.unregisterCallback(id, panelUpdateCallback)
     }
 
     override fun isVisible(): Boolean {
@@ -119,11 +137,13 @@ abstract class SystemUiWindowBase(
     }
 
     override fun hide() {
-        eventDispatcher.executeEvent(HIDE_EVENT_PREFIX + id)
+        val event = Event.Builder(SYSTEM_HIDE_PANEL_EVENT_ID).setPanelId(id).build()
+        eventDispatcher.executeEvent(event)
     }
 
     override fun show() {
-        eventDispatcher.executeEvent(SHOW_EVENT_PREFIX + id)
+        val event = Event.Builder(SYSTEM_SHOW_PANEL_EVENT_ID).setPanelId(id).build()
+        eventDispatcher.executeEvent(event)
     }
 
     override fun getHeight(): Int {
@@ -145,6 +165,8 @@ abstract class SystemUiWindowBase(
     override fun getCornerRadius(): Int {
         return panelUpdateConsumer.getCornerRadius(id) ?: 0
     }
+
+    override fun getDisplayId() = displayId
 
     override fun addCallback(callback: SystemUiWindow.WindowUpdateCallback) {
         panelUpdateConsumer.registerCallback(id, callback)

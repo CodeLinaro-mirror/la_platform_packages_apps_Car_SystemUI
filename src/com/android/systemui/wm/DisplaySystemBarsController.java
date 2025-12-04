@@ -23,6 +23,8 @@ import static android.view.WindowInsets.Type.statusBars;
 import static android.view.WindowInsets.Type.systemBars;
 
 import static com.android.systemui.car.Flags.packageLevelSystemBarVisibility;
+import static com.android.systemui.car.systembar.CarSystemBarController.NAVIGATION_BAR;
+import static com.android.systemui.car.systembar.CarSystemBarController.STATUS_BAR;
 import static com.android.systemui.car.systembar.SystemBarUtil.INVISIBLE_BAR_VISIBILITIES_TYPES_INDEX;
 import static com.android.systemui.car.systembar.SystemBarUtil.SYSTEM_BAR_PERSISTENCY_CONFIG_BARPOLICY;
 import static com.android.systemui.car.systembar.SystemBarUtil.SYSTEM_BAR_PERSISTENCY_CONFIG_IMMERSIVE;
@@ -34,6 +36,8 @@ import static com.android.systemui.car.systembar.SystemBarUtil.SYSTEM_BAR_SUW_PE
 import static com.android.systemui.car.systembar.SystemBarUtil.SYSTEM_BAR_SUW_PERSISTENCY_CONFIG_IMMERSIVE_WITH_STATUS;
 import static com.android.systemui.car.systembar.SystemBarUtil.VISIBLE_BAR_VISIBILITIES_TYPES_INDEX;
 import static com.android.systemui.car.users.CarSystemUIUserUtil.isSecondaryMUMDSystemUI;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_HIDE_PANEL_EVENT_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_SHOW_PANEL_EVENT_ID;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -65,8 +69,12 @@ import android.view.inputmethod.InputMethodManager;
 
 import androidx.annotation.VisibleForTesting;
 
+import com.android.car.scalableui.model.Event;
 import com.android.systemui.R;
 import com.android.systemui.car.wm.CarWMUserHelper;
+import com.android.systemui.car.wm.scalableui.EventDispatcher;
+import com.android.systemui.car.wm.scalableui.systemwindow.SystemBarWindow;
+import com.android.systemui.car.wm.scalableui.systemwindow.SystemUiWindowProvider;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -74,7 +82,9 @@ import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.UserChangeListener;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import javax.annotation.concurrent.GuardedBy;
 
@@ -123,6 +133,9 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
     private BroadcastReceiver mOverlayChangeBroadcastReceiver;
     private CarWMUserHelper.OccupantZoneChangeListener mOccupantChangeListener;
     private final ShellController mShellController;
+    private final BarControlPolicy mBarControlPolicy;
+    private final SystemUiWindowProvider mWindowProvider;
+    private final EventDispatcher mEventDispatcher;
 
     @GuardedBy("mPerDisplaySparseArrayLock")
     @VisibleForTesting
@@ -135,7 +148,9 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
             DisplayInsetsController displayInsetsController,
             @Main Handler mainHandler,
             CarWMUserHelper carWMUserHelper,
-            ShellController shellController) {
+            ShellController shellController,
+            SystemUiWindowProvider windowProvider,
+            EventDispatcher eventDispatcher) {
         mContext = context;
         mWmService = wmService;
         mDisplayInsetsController = displayInsetsController;
@@ -146,6 +161,9 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
         mSuwBehavior = mContext.getResources().getInteger(
                 R.integer.config_systemBarSuwBehavior);
         mShellController = shellController;
+        mBarControlPolicy = new BarControlPolicy();
+        mWindowProvider = windowProvider;
+        mEventDispatcher = eventDispatcher;
 
         mSuwSettingsObserver = new ContentObserver(mHandler) {
             @Override
@@ -167,7 +185,7 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
             // TODO(b/262773276): support per-user remote inset controllers
             displayController.addDisplayWindowListener(this);
             mContext.getContentResolver().registerContentObserver(Settings.Secure.getUriFor(
-                    CarSettings.Secure.KEY_SETUP_WIZARD_IN_PROGRESS),
+                            CarSettings.Secure.KEY_SETUP_WIZARD_IN_PROGRESS),
                     /* notifyForDescendants= */ true, mSuwSettingsObserver, UserHandle.USER_ALL);
             registerOverlayChangeBroadcastReceiver();
             registerOccupantZoneChangeListener();
@@ -187,22 +205,31 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
 
     @Override
     public void onDisplayAdded(int displayId) {
-        PerDisplay pd = new PerDisplay(displayId);
+        List<SystemBarWindow> displaySystemBars = mWindowProvider.getSystemBarWindows().stream()
+                .filter(window -> window.getDisplayId() == displayId)
+                .map(window -> (SystemBarWindow) window)
+                .collect(Collectors.toList());
+        PerDisplay pd = new PerDisplay(displayId, displaySystemBars, mEventDispatcher);
         pd.register();
         // Lazy loading policy control filters instead of during boot.
         synchronized (mPerDisplaySparseArrayLock) {
             if (mPerDisplaySparseArray == null) {
                 mPerDisplaySparseArray = new SparseArray<>();
-                BarControlPolicy.reloadFromSetting(mContext);
-                BarControlPolicy.registerContentObserver(mContext, mHandler, () -> {
-                    synchronized (mPerDisplaySparseArrayLock) {
-                        int size = mPerDisplaySparseArray.size();
-                        for (int i = 0; i < size; i++) {
-                            mPerDisplaySparseArray.valueAt(
-                                    i).updateDisplayWindowRequestedVisibleTypes();
-                        }
-                    }
-                });
+                mBarControlPolicy.reloadFromSetting(mContext);
+                mBarControlPolicy.registerSystemBarVisibilityOverrideObserver(mContext,
+                        mHandler,
+                        () -> {
+                            synchronized (mPerDisplaySparseArrayLock) {
+                                int size = mPerDisplaySparseArray.size();
+                                for (int i = 0; i < size; i++) {
+                                    mPerDisplaySparseArray.valueAt(
+                                            i).updateDisplayWindowRequestedVisibleTypes();
+                                }
+                            }
+                            // Add a return statement to satisfy the compiler's inferred return
+                            // type.
+                            return null;
+                        });
             }
             mPerDisplaySparseArray.put(displayId, pd);
         }
@@ -254,6 +281,11 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
         mUserHelper.addOccupantZoneChangeListener(mOccupantChangeListener);
     }
 
+    @VisibleForTesting
+    protected String getBarPolicyString() {
+        return mBarControlPolicy.getSettingValue();
+    }
+
     private boolean isSuwInProgress(int userId) {
         if (userId == INVALID_USER_ID) {
             return false;
@@ -276,9 +308,14 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
         int mImmersiveState = systemBars();
         boolean mIsSuwInProgress;
         String mPackageName;
+        EventDispatcher mEventDispatcher;
+        List<SystemBarWindow> mSystemBars;
 
-        PerDisplay(int displayId) {
+        PerDisplay(int displayId, List<SystemBarWindow> systemBarsForDisplay,
+                EventDispatcher eventDispatcher) {
             mDisplayId = displayId;
+            mSystemBars = systemBarsForDisplay;
+            mEventDispatcher = eventDispatcher;
             InputMethodManager inputMethodManager =
                     mContext.getSystemService(InputMethodManager.class);
             mInsetsController = new InsetsController(
@@ -307,6 +344,17 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
         @Override
         public void hideInsets(@InsetsType int types, @Nullable ImeTracker.Token statsToken) {
             if ((types & WindowInsets.Type.ime()) == 0) {
+                mSystemBars.forEach(window -> {
+                    if (((types & WindowInsets.Type.statusBars()) != 0
+                            && window.getType() == STATUS_BAR) || (
+                            (types & WindowInsets.Type.navigationBars()) != 0
+                                    && window.getType() == NAVIGATION_BAR)) {
+                        Event event = new Event.Builder(SYSTEM_HIDE_PANEL_EVENT_ID)
+                                .setPanelId(window.getName())
+                                .build();
+                        mEventDispatcher.executeEvent(event);
+                    }
+                });
                 mInsetsController.hide(types, statsToken);
             }
         }
@@ -314,6 +362,17 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
         @Override
         public void showInsets(@InsetsType int types, @Nullable ImeTracker.Token statsToken) {
             if ((types & WindowInsets.Type.ime()) == 0) {
+                mSystemBars.forEach(window -> {
+                    if (((types & WindowInsets.Type.statusBars()) != 0
+                            && window.getType() == STATUS_BAR) || (
+                            (types & WindowInsets.Type.navigationBars()) != 0
+                                    && window.getType() == NAVIGATION_BAR)) {
+                        Event event = new Event.Builder(SYSTEM_SHOW_PANEL_EVENT_ID)
+                                .setPanelId(window.getName())
+                                .build();
+                        mEventDispatcher.executeEvent(event);
+                    }
+                });
                 mInsetsController.show(types, statsToken);
             }
         }
@@ -434,10 +493,12 @@ public class DisplaySystemBarsController implements DisplayController.OnDisplays
             if (mIsSuwInProgress && mSuwBehavior != SYSTEM_BAR_SUW_PERSISTENCY_CONFIG_DISABLED) {
                 barVisibilities = getBarVisibilitiesForSuw();
             } else if (mBehavior == SYSTEM_BAR_PERSISTENCY_CONFIG_BARPOLICY) {
-                barVisibilities = packageLevelSystemBarVisibility()
-                        ? BarControlPolicy.getBarVisibilities(
+                BarVisibility barVis = packageLevelSystemBarVisibility()
+                        ? mBarControlPolicy.getBarVisibilities(
                         mPackageName, mWindowRequestedVisibleTypes)
-                        : BarControlPolicy.getBarVisibilities(mPackageName);
+                        : mBarControlPolicy.getBarVisibilities(mPackageName);
+                barVisibilities =
+                        new int[]{barVis.getShowTypes(), barVis.getHideTypes()};
             } else if (immersiveState == STATE_IMMERSIVE_WITH_NAV_BAR) {
                 barVisibilities = mImmersiveWithNavBarVisibilities;
             } else if (immersiveState == STATE_IMMERSIVE_WITH_STATUS_BAR) {

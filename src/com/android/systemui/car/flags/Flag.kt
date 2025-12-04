@@ -68,7 +68,12 @@ enum class Flag(
     /**
      * The resource ID for the legacy boolean flag, used as a fallback.
      */
-    @BoolRes val resourceId: Int
+    @BoolRes val resourceId: Int,
+
+    /**
+     * Resource map IDs for when this flag is enabled
+     */
+    var resourceMap: Map<Int, Int>? = null,
 ) {
 
     /**
@@ -129,7 +134,12 @@ enum class Flag(
      */
     EnableExtPanelUpdates(
         "com.android.car.scalableui.Flags.enableExtPanelUpdates",
-        R.bool.enable_ext_panel_updates
+        R.bool.enable_ext_panel_updates,
+        mapOf(
+            R.array.window_states to R.array.window_states_enable_ext_panel_updates,
+            R.string.config_privacyIndicatorLocation
+                    to R.string.config_privacyIndicatorLocation_enable_ext_panel_updates
+        )
     ),
 
     /**
@@ -152,7 +162,7 @@ enum class Flag(
      * Checks if the DisplayCompatibilityV2 is enabled.
      */
     DisplayCompatibilityV2(
-        "com.android.systemui.car.display_compatibility_v2",
+        "com.android.systemui.car.Flags.displayCompatibilityV2",
         R.bool.display_compatibility_v2
     ),
 

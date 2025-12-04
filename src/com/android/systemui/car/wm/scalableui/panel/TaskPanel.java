@@ -98,7 +98,7 @@ import java.util.stream.IntStream;
  * A {@link RootTaskStack} based implementation of a {@link Panel}.
  */
 @SuppressLint("MissingPermission")
-public final class TaskPanel extends BasePanel {
+public final class TaskPanel extends SysUIPanel {
     private static final String TAG = TaskPanel.class.getSimpleName();
     private static final long INITIAL_RETRY_DELAY_MS = 1000;
     private static final long CHECK_RESTART_SUCCESS_DELAY_MS = 500;
@@ -356,6 +356,14 @@ public final class TaskPanel extends BasePanel {
     }
 
     @Override
+    public void destroy() {
+        if (mRootTaskStack != null) {
+            mAutoTaskStackController.destroyTaskStack(mRootTaskStack.getId());
+        }
+        super.destroy();
+    }
+
+    @Override
     public void reset() {
         super.reset();
         if (getRootStack() == null) {
@@ -426,7 +434,7 @@ public final class TaskPanel extends BasePanel {
         // Remove the AutoDecor that is no longer there.
         Set<Map.Entry<String, AutoDecor>> decorToRemove =
                 mExistingAutoDecors.entrySet().stream()
-                        .filter(entry -> decors.containsKey(entry.getKey()))
+                        .filter(entry -> !decors.containsKey(entry.getKey()))
                         .peek(entry -> {
                             logIfDebuggable("Remove decor" + entry.getKey());
                             mAutoDecorManager.removeAutoDecor(entry.getValue());

@@ -58,8 +58,7 @@ import com.android.systemui.car.wm.scalableui.systemwindow.SystemBarWindow;
 import com.android.systemui.car.wm.scalableui.systemwindow.SystemUiWindow;
 import com.android.systemui.car.wm.scalableui.systemwindow.SystemUiWindowProvider;
 import com.android.systemui.dagger.qualifiers.Main;
-
-import org.jetbrains.annotations.NotNull;
+import com.android.systemui.settings.DisplayTracker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -100,6 +99,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
 
     private final Context mContext;
     private final Resources mResources;
+    private final int mDefaultDisplayId;
     private final List<String> mSystemBarNamesByZOrder = new ArrayList<>();
     /** Maps @WindowManager.LayoutParams.WindowType to window contexts for that type. */
     private final Map<Integer, Context> mWindowContexts = new ArrayMap<>();
@@ -117,12 +117,14 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     public SystemBarConfigsImpl(Context context, @Main Resources resources,
             SystemUiWindowProvider windowProvider,
             Map<String, CarSystemBarViewSupplier> viewSupplerMap,
-            Map<String, CarSystemBarWindowSupplier> windowSupplierMap) {
+            Map<String, CarSystemBarWindowSupplier> windowSupplierMap,
+            DisplayTracker displayTracker) {
         mContext = context;
         mResources = resources;
         mWindowProvider = windowProvider;
         mViewSupplierMap = viewSupplerMap;
         mWindowSupplierMap = windowSupplierMap;
+        mDefaultDisplayId = displayTracker.getDefaultDisplayId();
         init();
     }
 
@@ -257,12 +259,16 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     @Override
     public boolean getHideForKeyboardByName(@NonNull String name) {
         SystemBarWindow systemBarWindow = mSystemBars.get(name);
-        return systemBarWindow != null && systemBarWindow.getConfiguration().isHiddenForKeyboard();
+        return systemBarWindow != null && systemBarWindow.isHiddenForKeyboard();
     }
 
     @Override
     public void insetSystemBar(@NonNull String name, ViewGroup view) {
-        if (mSystemBars.get(name) == null) return;
+        if (mSystemBars.get(name) == null || !(mSystemBars.get(
+                name) instanceof InternalSystemBarWindow)) {
+            //This method only applies padding to InternalSystemBarWindow instances.
+            return;
+        }
 
         Insets insets = mSystemBars.get(name).getInsets();
         if (insets == null) {
@@ -285,7 +291,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     @Override
     public int getSystemBarInsetTypeByName(@NonNull String name) {
         SystemBarWindow systemBarWindow = mSystemBars.get(name);
-        return systemBarWindow != null ? systemBarWindow.getConfiguration().getType() : -1;
+        return systemBarWindow != null ? systemBarWindow.getType() : -1;
     }
 
     @Override
@@ -305,8 +311,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     void updateInsetPaddings(String name, Map<String, Boolean> barVisibilities) {
         SystemBarWindow systemBarWindow = mSystemBars.get(name);
         if (systemBarWindow == null) return;
-
-        SystemBarConfiguration currentConfig = systemBarWindow.getConfiguration();
 
         int defaultLeftPadding = 0;
         int defaultRightPadding = 0;
@@ -362,25 +366,25 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         }
 
         if (isHorizontalBar(name)) {
-            if (mLeftNavBarEnabled && currentConfig.getZOrder() < mSystemBars.get(
-                    LEFT_BAR_NAME).getConfiguration().getZOrder()) {
+            if (mLeftNavBarEnabled && systemBarWindow.getZOrder() < mSystemBars.get(
+                    LEFT_BAR_NAME).getZOrder()) {
                 defaultLeftPadding = barVisibilities.get(LEFT_BAR_NAME) ? mSystemBars.get(
                         LEFT_BAR_NAME).getWidth() : defaultLeftPadding;
             }
-            if (mRightNavBarEnabled && currentConfig.getZOrder() < mSystemBars.get(
-                    RIGHT_BAR_NAME).getConfiguration().getZOrder()) {
+            if (mRightNavBarEnabled && systemBarWindow.getZOrder() < mSystemBars.get(
+                    RIGHT_BAR_NAME).getZOrder()) {
                 defaultRightPadding = barVisibilities.get(RIGHT_BAR_NAME) ? mSystemBars.get(
                         RIGHT_BAR_NAME).getWidth() : defaultLeftPadding;
             }
         }
         if (isVerticalBar(name)) {
-            if (mTopNavBarEnabled && currentConfig.getZOrder() < mSystemBars.get(
-                    TOP_BAR_NAME).getConfiguration().getZOrder()) {
+            if (mTopNavBarEnabled && systemBarWindow.getZOrder() < mSystemBars.get(
+                    TOP_BAR_NAME).getZOrder()) {
                 defaultTopPadding = barVisibilities.get(TOP_BAR_NAME) ? mSystemBars.get(
                         TOP_BAR_NAME).getHeight() : defaultTopPadding;
             }
-            if (mBottomNavBarEnabled && currentConfig.getZOrder() < mSystemBars.get(
-                    BOTTOM_BAR_NAME).getConfiguration().getZOrder()) {
+            if (mBottomNavBarEnabled && systemBarWindow.getZOrder() < mSystemBars.get(
+                    BOTTOM_BAR_NAME).getZOrder()) {
                 defaultBottomPadding = barVisibilities.get(BOTTOM_BAR_NAME) ? mSystemBars.get(
                         BOTTOM_BAR_NAME).getHeight() : defaultBottomPadding;
             }
@@ -437,7 +441,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .build();
             SystemBarWindow topBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_top_system_bar_height),
-                    topBarConfig, this::isHorizontalBar);
+                    topBarConfig, this::isHorizontalBar, mDefaultDisplayId);
 
             mSystemBars.put(TOP_BAR_NAME, topBarWindow);
         }
@@ -455,7 +459,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .build();
             SystemBarWindow bottomBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_bottom_system_bar_height),
-                    bottomBarConfig, this::isHorizontalBar);
+                    bottomBarConfig, this::isHorizontalBar, mDefaultDisplayId);
 
             mSystemBars.put(BOTTOM_BAR_NAME, bottomBarWindow);
         }
@@ -473,7 +477,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .build();
             SystemBarWindow leftBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_left_system_bar_width),
-                    leftBarConfig, this::isHorizontalBar);
+                    leftBarConfig, this::isHorizontalBar, mDefaultDisplayId);
 
             mSystemBars.put(LEFT_BAR_NAME, leftBarWindow);
         }
@@ -491,7 +495,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .build();
             SystemBarWindow rightBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_right_system_bar_width),
-                    rightBarConfig, this::isHorizontalBar);
+                    rightBarConfig, this::isHorizontalBar, mDefaultDisplayId);
 
             mSystemBars.put(RIGHT_BAR_NAME, rightBarWindow);
         }
@@ -559,9 +563,9 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     }
 
     private void sortSystemBarTypesByZOrder() {
-        List<Map.Entry<String, SystemBarConfiguration>> systemBarsByZOrder = new ArrayList<>();
+        List<Map.Entry<String, SystemBarWindow>> systemBarsByZOrder = new ArrayList<>();
         mSystemBars.keySet().forEach(name -> {
-            systemBarsByZOrder.add(Map.entry(name, mSystemBars.get(name).getConfiguration()));
+            systemBarsByZOrder.add(Map.entry(name, mSystemBars.get(name)));
         });
 
         systemBarsByZOrder.sort(Comparator.comparingInt(entry -> entry.getValue().getZOrder()));
@@ -594,8 +598,8 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         SystemBarWindow verticalWindow = mSystemBars.get(verticalName);
 
         if (verticalWindow != null && horizontalWindow != null) {
-            int horizontalBarZOrder = horizontalWindow.getConfiguration().getZOrder();
-            int verticalBarZOrder = verticalWindow.getConfiguration().getZOrder();
+            int horizontalBarZOrder = horizontalWindow.getZOrder();
+            int verticalBarZOrder = verticalWindow.getZOrder();
 
             if (horizontalBarZOrder == verticalBarZOrder) {
                 throw new RuntimeException(
@@ -698,6 +702,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
 
     private static class InternalSystemBarWindow implements SystemBarWindow {
         private final int mGirth;
+        private final int mDefaultDisplayId;
         private final SystemBarConfiguration mConfig;
         private final WindowManager mWindowManager;
         private final Function<String, Boolean> mHorizontalChecker;
@@ -706,7 +711,7 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         private Insets mInsets;
 
         private InternalSystemBarWindow(Context ctx, int girth, SystemBarConfiguration config,
-                Function<String, Boolean> horizontalChecker) {
+                Function<String, Boolean> horizontalChecker, int defaultDisplayId) {
             mGirth = girth;
             mConfig = config;
             Context context = ctx.createWindowContext(mapZOrderToBarType(mConfig.getZOrder()),
@@ -714,12 +719,28 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
             mWindowManager = context.getSystemService(WindowManager.class);
             mHorizontalChecker = horizontalChecker;
             mWindowBounds = mWindowManager.getCurrentWindowMetrics().getBounds();
+            mDefaultDisplayId = defaultDisplayId;
         }
 
         @NonNull
         @Override
         public String getName() {
-            return getConfiguration().getName();
+            return mConfig.getName();
+        }
+
+        @Override
+        public int getType() {
+            return mConfig.getType();
+        }
+
+        @Override
+        public int getZOrder() {
+            return mConfig.getZOrder();
+        }
+
+        @Override
+        public boolean isHiddenForKeyboard() {
+            return mConfig.isHiddenForKeyboard();
         }
 
         @Override
@@ -854,6 +875,11 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         }
 
         @Override
+        public int getDisplayId() {
+            return mDefaultDisplayId;
+        }
+
+        @Override
         public void addCallback(@NonNull WindowUpdateCallback callback) {
 
         }
@@ -861,12 +887,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         @Override
         public void removeCallback(@NonNull WindowUpdateCallback callback) {
 
-        }
-
-        @Override
-        @NotNull
-        public SystemBarConfiguration getConfiguration() {
-            return mConfig;
         }
     }
 }
