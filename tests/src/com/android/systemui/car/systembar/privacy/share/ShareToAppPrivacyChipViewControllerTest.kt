@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.android.systemui.car.systembar
+package com.android.systemui.car.systembar.privacy.share
 
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.SetFlagsRule
@@ -29,8 +29,8 @@ import com.android.systemui.car.CarSystemUiTest
 import com.android.systemui.car.Flags.FLAG_SHOW_MEDIA_PROJECTION_INDICATOR
 import com.android.systemui.car.flexibleui.CarSystemBarElementStateController
 import com.android.systemui.car.flexibleui.CarSystemBarElementStatusBarDisableController
-import com.android.systemui.car.privacy.CastToOtherDevicePrivacyChip
-import com.android.systemui.statusbar.chips.casttootherdevice.ui.viewmodel.CastToOtherDeviceChipViewModel
+import com.android.systemui.car.privacy.PrivacyChip
+import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import java.util.concurrent.Executor
@@ -58,75 +58,73 @@ import org.mockito.kotlin.verify
 @EnableFlags(FLAG_SHOW_MEDIA_PROJECTION_INDICATOR)
 @RunWithLooper
 @SmallTest
-class CastToOtherDevicePrivacyChipViewControllerTest : CarSysuiTestCase() {
+class ShareToAppPrivacyChipViewControllerTest : CarSysuiTestCase() {
 
     @get:Rule val setFlagsRule = SetFlagsRule()
 
     private val testScope = TestScope()
-    private val runnableArgumentCaptor = argumentCaptor<Runnable>()
     private val chipModelFlow: MutableStateFlow<OngoingActivityChipModel> =
         MutableStateFlow(OngoingActivityChipModel.Inactive())
-    private val executor = mock<Executor>()
     private val instanceId = mock<InstanceId>()
     private val barElementDisableController = mock<CarSystemBarElementStatusBarDisableController>()
     private val barElementStateController = mock<CarSystemBarElementStateController>()
-    private val castToOtherDeviceChipViewModel =
-        mock<CastToOtherDeviceChipViewModel> { on { chip } doReturn chipModelFlow }
+    private val shareToAppChipViewModel =
+        mock<ShareToAppChipViewModel> { on { chip } doReturn chipModelFlow }
+    private val executor = mock<Executor>()
+    private val runnableArgumentCaptor = argumentCaptor<Runnable>()
 
-    private lateinit var castToOtherDevicePrivacyChip: CastToOtherDevicePrivacyChip
-    private lateinit var castToOtherDevicePrivacyChipViewController:
-        CastToOtherDevicePrivacyChipViewController
+    private lateinit var shareToAppPrivacyChip: ShareToAppPrivacyChip
+    private lateinit var shareToAppPrivacyChipViewController: ShareToAppPrivacyChipViewController
 
     @Before
     fun setUp() {
         val context = spy(mContext).stub { on { mainExecutor } doReturn executor }
-        castToOtherDevicePrivacyChip =
+        shareToAppPrivacyChip =
             spy(
-                LayoutInflater.from(mContext)
-                    .inflate(R.layout.cast_to_other_device_privacy_chip, null)
-                    as CastToOtherDevicePrivacyChip
+                LayoutInflater.from(mContext).inflate(R.layout.share_to_app_privacy_chip, null)
+                    as ShareToAppPrivacyChip
             )
-        castToOtherDevicePrivacyChipViewController =
-            CastToOtherDevicePrivacyChipViewController(
-                castToOtherDevicePrivacyChip,
+        shareToAppPrivacyChipViewController =
+            ShareToAppPrivacyChipViewController(
+                shareToAppPrivacyChip,
                 barElementDisableController,
                 barElementStateController,
                 context,
                 testScope.backgroundScope,
-                castToOtherDeviceChipViewModel,
+                shareToAppChipViewModel,
             )
     }
 
     @Test
     fun onViewAttached_callsAnimateIn_whenStateIsActive() =
         testScope.runTest {
-            castToOtherDevicePrivacyChipViewController.onViewAttachedInternal()
+            shareToAppPrivacyChipViewController.onViewAttached()
 
             chipModelFlow.value = createActiveChipModel()
             runCurrent()
             verify(executor).execute(runnableArgumentCaptor.capture())
             runnableArgumentCaptor.firstValue.run()
 
-            verify(castToOtherDevicePrivacyChip).animateIn()
+            verify(shareToAppPrivacyChip).animateIn()
         }
 
     @Test
     fun onViewAttached_callsAnimateOut_whenStateIsInactive() =
         testScope.runTest {
-            castToOtherDevicePrivacyChipViewController.onViewAttachedInternal()
+            shareToAppPrivacyChipViewController.onViewAttached()
 
             chipModelFlow.value = OngoingActivityChipModel.Inactive()
             runCurrent()
             verify(executor).execute(runnableArgumentCaptor.capture())
             runnableArgumentCaptor.firstValue.run()
 
-            verify(castToOtherDevicePrivacyChip).animateOut()
+            verify(shareToAppPrivacyChip).animateOut()
         }
 
     @Test
-    fun onViewDetached_stopsCollectingState() =
+    fun onViewDetached_stopsCollectingStatus() =
         testScope.runTest {
-            castToOtherDevicePrivacyChipViewController.onViewDetachedInternal()
+            shareToAppPrivacyChipViewController.onViewDetached()
 
             chipModelFlow.value = createActiveChipModel()
             runCurrent()
@@ -136,9 +134,9 @@ class CastToOtherDevicePrivacyChipViewControllerTest : CarSysuiTestCase() {
 
     private fun createActiveChipModel() =
         OngoingActivityChipModel.Active(
-            key = "CastToOtherDevice",
+            key = "ShareToApp",
             icon = null,
-            content = OngoingActivityChipModel.Content.Text("CastToOtherDevice"),
+            content = OngoingActivityChipModel.Content.Text("ShareToApp"),
             colors = ColorsModel.Red,
             clickBehavior = OngoingActivityChipModel.ClickBehavior.None,
             instanceId = instanceId,
