@@ -66,10 +66,12 @@ carsysui_pods = [
     "CarSystemUI-SystemBar-DebugPanel",
     "CarSystemUI-SystemBar-HomeButton",
     "CarSystemUI-SystemBar-PassengerHomeButton",
+    "CarSystemUI-SystemBar-PrivacyChip-Base",
     "CarSystemUI-SystemBar-PrivacyChip-Camera",
     "CarSystemUI-SystemBar-PrivacyChip-Cast",
     "CarSystemUI-SystemBar-PrivacyChip-Mic",
     "CarSystemUI-SystemBar-PrivacyChip-Share",
+    "CarSystemUI-SystemBar-UserNamePanel",
 ]
 
 java_defaults {
@@ -158,6 +160,10 @@ android_library {
     ],
     enforce_uses_libs: false,
 
+    kotlincflags: [
+        "-J-Xmx12288M",
+    ],
+
     javacflags: ["-Adagger.fastInit=enabled"],
     plugins: ["dagger2-compiler"],
 }
@@ -218,10 +224,6 @@ android_app {
         ],
         included_proguard_flags_files: [":sysui_proguard_common_and_kotlin"],
     },
-    // TODO(b/301283770): Compiling CarSystemUI should not require -J-Xmx8192M
-    javacflags: [
-        "-J-Xmx8192M",
-    ],
     dxflags: ["--multi-dex"],
 
     aaptflags: [
