@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
+
+subdirs = ["pods"]
+
 package {
     default_applicable_licenses: ["Android-Apache-2.0"],
     default_team: "trendy_team_system_experience",
@@ -26,6 +29,31 @@ genrule {
     out: ["com/android/systemui/car/CarSystemUIStatsLog.java"],
 }
 
+// List of files that need to be available in CarSystemUI-core
+// Because they are
+// - related to dagger initialization
+// - depend on dagger components for initialization
+filegroup {
+    name: "CarSystemUI-application-srcs",
+    srcs: [
+        "src/**/*Module.java",
+        "src/**/*Module.kt",
+        "src/com/android/systemui/CarComponentBinder.java",
+        "src/com/android/systemui/CarGlobalRootComponent.java",
+        "src/com/android/systemui/CarSysUIComponent.java",
+        "src/com/android/systemui/CarSysUIDisplaySubcomponent.kt",
+        "src/com/android/systemui/CarSystemUIActivityBinder.java",
+        "src/com/android/systemui/CarSystemUIAppComponentFactory.java",
+        "src/com/android/systemui/CarSystemUIBinder.java",
+        "src/com/android/systemui/CarSystemUIInitializer.java",
+        "src/com/android/systemui/CarSystemUIServiceBinder.java",
+        "src/com/android/systemui/car/userpicker/ActivityHelper.java",
+        "src/com/android/systemui/car/userpicker/UserPickerActivity.java",
+        "src/com/android/systemui/car/userpicker/UserPickerActivityComponent.java",
+        "src/com/android/systemui/wmshell/CarWMComponent.java",
+    ],
+}
+
 carsystemui_srcs = [
     "src/**/*.java",
     "src/**/*.kt",
@@ -37,6 +65,9 @@ java_defaults {
     name: "CarSystemUI-core-defaults",
 
     srcs: carsystemui_srcs,
+    exclude_srcs: [
+        ":CarSystemUI-application-srcs",
+    ],
 
     resource_dirs: [
         "res-keyguard",
@@ -44,6 +75,7 @@ java_defaults {
     ],
 
     static_libs: [
+        "CarSystemUI-FlexibleUI",
         "SystemUI-application",
         "SystemUI-core",
         "CarNotificationLib",
@@ -99,6 +131,29 @@ java_defaults {
 android_library {
     name: "CarSystemUI-core",
 
+    srcs: [
+        ":CarSystemUI-application-srcs",
+    ],
+
+    resource_dirs: [],
+    manifest: "AndroidManifest.xml",
+
+    static_libs: [
+        "CarSystemUI-Shared",
+        // pods go here
+    ],
+
+    libs: [
+        "android.car",
+    ],
+    enforce_uses_libs: false,
+
+    javacflags: ["-Adagger.fastInit=enabled"],
+    plugins: ["dagger2-compiler"],
+}
+
+android_library {
+    name: "CarSystemUI-Shared",
     defaults: [
         "CarSystemUI-core-defaults",
     ],
@@ -107,11 +162,11 @@ android_library {
         "--no-resource-deduping",
     ],
 
+    manifest: "AndroidManifest-shared.xml",
+
     javacflags: ["-Adagger.fastInit=enabled"],
-
-    manifest: "AndroidManifest.xml",
-
     plugins: ["dagger2-compiler"],
+
     // TODO(b/319708040): re-enable use_resource_processor
     use_resource_processor: false,
 }
@@ -219,6 +274,8 @@ android_library {
         "res",
     ],
     static_libs: [
+        "CarSystemUI-Shared",
+        "CarSystemUI-FlexibleUI",
         "SystemUI-tests-base",
         "CarNotificationLib",
         "android.car.test.utils",
@@ -385,6 +442,7 @@ android_ravenwood_test {
     static_libs: [
         "CarSystemUI-core",
         "CarSystemUI-tests-base",
+        "androidx.compose.ui_ui-test-junit4",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",

@@ -21,6 +21,7 @@ import static com.android.car.scalableui.loader.xml.HunTagXmlParserKt.HUN_PANEL_
 import android.content.Context;
 import android.hardware.display.DisplayManager;
 import android.os.Handler;
+import android.os.UserManager;
 import android.util.Log;
 import android.view.IWindowManager;
 
@@ -48,6 +49,7 @@ import com.android.systemui.car.wm.scalableui.panel.DecorPanel;
 import com.android.systemui.car.wm.scalableui.panel.SysUIPanel;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.systemui.car.wm.scalableui.panel.controller.PanelControllerModule;
+import com.android.systemui.car.wm.scalableui.panel.panelupdates.PanelConfigReadStateMonitor;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.PanelUpdateConsumer;
 import com.android.systemui.car.wm.scalableui.panel.panelupdates.ScalableUIPanelUpdateImpl;
 import com.android.systemui.car.wm.scalableui.systemwindow.HunWindow;
@@ -99,14 +101,15 @@ public abstract class CarWMShellModule {
     @WMSingleton
     @Provides
     static DisplaySystemBarsController provideDisplaySystemBarsController(Context context,
+            UserManager userManager, CarServiceProvider carServiceProvider,
             IWindowManager wmService, DisplayController displayController,
             DisplayInsetsController displayInsetsController,
             @Main Handler mainHandler, CarWMUserHelper userHelper,
             ShellController shellController, SystemUiWindowProvider windowProvider,
             EventDispatcher dispatcher) {
-        return new DisplaySystemBarsController(context, wmService, displayController,
-                displayInsetsController, mainHandler, userHelper, shellController, windowProvider,
-                dispatcher);
+        return new DisplaySystemBarsController(context, userManager, carServiceProvider, wmService,
+                displayController, displayInsetsController, mainHandler, userHelper,
+                shellController, windowProvider, dispatcher);
     }
 
     @WMSingleton
@@ -197,6 +200,7 @@ public abstract class CarWMShellModule {
             TaskPanel.Factory taskPanelFactory,
             DecorPanel.Factory decorPanelFactory,
             SysUIPanel.Factory sysUiPanelFactory,
+            PanelConfigReadStateMonitor panelConfigMonitor,
             FlagManager flagManager
     ) {
         if (ScalableUIUtils.isScalableUIEnabled(context, flagManager)) {
@@ -205,6 +209,7 @@ public abstract class CarWMShellModule {
                     taskPanelFactory,
                     decorPanelFactory,
                     sysUiPanelFactory,
+                    panelConfigMonitor,
                     flagManager));
         }
         return Optional.empty();
@@ -229,15 +234,15 @@ public abstract class CarWMShellModule {
             Lazy<PanelAutoTaskStackTransitionHandlerDelegate> delegate,
             ScalableUIDumpsys scalableUIDumpsys,
             FlagManager flagManager,
-            DisplayController displayController,
-            AutoTaskStackHelper autoTaskStackHelper) {
+            AutoTaskStackHelper autoTaskStackHelper,
+            ShellController shellController) {
         if (ScalableUIUtils.isScalableUIEnabled(context, flagManager)
                 && panelConfigReaderOptional.isPresent()) {
             return Optional.of(
                     new ScalableUIWMInitializer(context, shellInit,
                             actionConfigReaderOptional.get(),
                             panelConfigReaderOptional.get(), delegate.get(), scalableUIDumpsys,
-                            displayController, autoTaskStackHelper, flagManager));
+                            autoTaskStackHelper, flagManager, shellController));
         }
         return Optional.empty();
     }

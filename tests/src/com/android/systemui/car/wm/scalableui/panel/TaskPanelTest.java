@@ -20,6 +20,7 @@ import static android.car.app.CarActivityManager.LAUNCH_BEHAVIOR_REMAIN_IN_SOURC
 import static com.android.car.scalableui.model.Restart.RESTART_POLICY_DEFAULT;
 import static com.android.car.scalableui.model.Restart.RESTART_POLICY_LAST;
 import static com.android.car.scalableui.model.TaskBehavior.NEW_TASK_LAUNCH_POLICY_REMAIN_IN_SOURCE;
+import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -198,6 +199,7 @@ public class TaskPanelTest extends CarSysuiTestCase {
 
     @Test
     public void scheduleRestartAttempt_withLastPolicy_restartsLastTask() {
+        mTaskPanel.setVisibility(true);
         assumeTrue(mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart));
         Intent intent = new Intent("TEST_ACTION");
         mRunningTaskInfo.baseIntent = intent;
@@ -212,6 +214,7 @@ public class TaskPanelTest extends CarSysuiTestCase {
 
     @Test
     public void scheduleRestartAttempt_withDefaultPolicy_restartsDefaultTask() {
+        mTaskPanel.setVisibility(true);
         assumeTrue(mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart));
         Intent intent = new Intent("DEFAULT_ACTION");
         doReturn(intent).when(mTaskPanel).getDefaultIntent();
@@ -226,6 +229,7 @@ public class TaskPanelTest extends CarSysuiTestCase {
 
     @Test
     public void scheduleRestartAttempt_maxRetriesReached_sendsEmptyEvent() {
+        mTaskPanel.setVisibility(true);
         assumeTrue(mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart));
         when(mPanelState.getRestart()).thenReturn(mRestart);
         when(mRestart.getMaxRetry()).thenReturn(0);
@@ -233,6 +237,22 @@ public class TaskPanelTest extends CarSysuiTestCase {
         mTaskPanel.scheduleRestartAttempt(mRunningTaskInfo);
 
         verify(mEventDispatcher).executeEvent(any(Event.class));
+    }
+
+    @Test
+    public void scheduleRestartAttempt_invisiblePanel_skipped() {
+        mTaskPanel.setVisibility(false);
+        assumeTrue(mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart));
+        Intent intent = new Intent("DEFAULT_ACTION");
+        doReturn(intent).when(mTaskPanel).getDefaultIntent();
+        when(mPanelState.getRestart()).thenReturn(mRestart);
+        when(mRestart.getMaxRetry()).thenReturn(1);
+        when(mRestart.getPolicy()).thenReturn(RESTART_POLICY_DEFAULT);
+
+        mTaskPanel.scheduleRestartAttempt(mRunningTaskInfo);
+
+        verify(mUserContext, never()).startActivityAsUser(intent, UserHandle.CURRENT);
+        verify(mEventDispatcher, never()).executeEvent(any(Event.class));
     }
 
     @Test
@@ -268,5 +288,26 @@ public class TaskPanelTest extends CarSysuiTestCase {
 
         verify(mCarActivityManager).setLaunchBehaviorForRootTask(any(),
                 eq(LAUNCH_BEHAVIOR_REMAIN_IN_SOURCE_ROOT_TASK));
+    }
+
+    @Test
+    public void getRootTaskToken_whenRootTaskStackIsNull_returnsNull() {
+        mTaskPanel.setRootTaskStack(null);
+
+        WindowContainerToken token = mTaskPanel.getRootTaskToken();
+
+        assertThat(token).isNull();
+    }
+
+    @Test
+    public void getRootTaskToken_whenRootTaskStackExists_returnsToken() {
+        WindowContainerToken expectedToken = mock(WindowContainerToken.class);
+        ActivityManager.RunningTaskInfo runningTaskInfo = new ActivityManager.RunningTaskInfo();
+        runningTaskInfo.token = expectedToken;
+        when(mRootTaskStack.getRootTaskInfo()).thenReturn(runningTaskInfo);
+
+        WindowContainerToken actualToken = mTaskPanel.getRootTaskToken();
+
+        assertThat(actualToken).isEqualTo(expectedToken);
     }
 }

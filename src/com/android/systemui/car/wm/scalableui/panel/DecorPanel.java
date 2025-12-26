@@ -17,6 +17,7 @@ package com.android.systemui.car.wm.scalableui.panel;
 
 import android.content.Context;
 import android.graphics.Rect;
+import android.os.Trace;
 import android.util.Log;
 import android.view.SurfaceControl;
 import android.view.View;
@@ -43,6 +44,7 @@ import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
 import dagger.assisted.AssistedInject;
 
+import java.io.PrintWriter;
 import java.util.Optional;
 
 /**
@@ -93,7 +95,7 @@ public final class DecorPanel extends SysUIPanel {
     @Nullable
     private View initFromController() {
         mDecorPanelController = mPanelControllerInitializer.createDecorPanelController(
-                getPanelControllerMetadata());
+                getPanelId(), getPanelControllerMetadata());
         return mDecorPanelController == null ? null : mDecorPanelController.getView();
     }
 
@@ -182,6 +184,7 @@ public final class DecorPanel extends SysUIPanel {
             Log.e(TAG, "AutoSurfaceTransaction cannot be null for DecorPanel updates");
             return;
         }
+        Trace.beginSection(TAG + "#updateInternal");
         super.updateInternal(autoSurfaceTransaction, tx, variant, updateChildren);
         logIfDebuggable("updateDecorPanelSurface:" + this);
         Rect bounds = variant == null ? getBounds() : variant.getBounds();
@@ -194,25 +197,23 @@ public final class DecorPanel extends SysUIPanel {
                 variant == null ? getCornerRadius() : variant.getCornerRadius());
         autoSurfaceTransaction.setCrop(getAutoDecor(),
                 new Rect(0, 0, bounds.width(), bounds.height()));
-        //TODO(b/404959846): replace with autoSurfaceTransaction api if available.
-        if (mDecorView != null) {
-            mDecorView.setAlpha(variant == null ? getAlpha() : variant.getAlpha());
-            mDecorView.post(() -> {
-                int vis;
-                if (variant == null) {
-                    vis = isVisible() ? View.VISIBLE : View.GONE;
-                } else {
-                    vis = variant.isVisible() ? View.VISIBLE : View.GONE;
-                }
-                mDecorView.setVisibility(vis);
-            });
-        }
+        autoSurfaceTransaction.setAlpha(getAutoDecor(),
+                variant == null ? getAlpha() : variant.getAlpha());
+        autoSurfaceTransaction.setVisibility(getAutoDecor(),
+                variant == null ? isVisible() : variant.isVisible());
+        Trace.endSection();
     }
 
     @AssistedFactory
     public interface Factory {
         /** Create instance of {@link DecorPanel} with specified id */
         DecorPanel create(String id);
+    }
+
+    @Override
+    public void dump(@NonNull PrintWriter pw) {
+        pw.print(this);
+        pw.print(mDecorPanelController);
     }
 
     @Override
