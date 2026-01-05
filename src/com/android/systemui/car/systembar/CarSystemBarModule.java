@@ -37,7 +37,14 @@ import com.android.systemui.car.hvac.HvacButtonController;
 import com.android.systemui.car.hvac.TemperatureControlViewController;
 import com.android.systemui.car.keyguard.KeyguardSystemBarPresenter;
 import com.android.systemui.car.notification.NotificationButtonController;
-import com.android.systemui.car.statusicon.StatusIconPanelViewController;
+import com.android.systemui.car.systembar.debugpanel.DebugPanelModule;
+import com.android.systemui.car.systembar.home.HomeButtonModule;
+import com.android.systemui.car.systembar.passengerhome.PassengerHomeButtonModule;
+import com.android.systemui.car.systembar.privacy.camera.PrivacyChipCameraModule;
+import com.android.systemui.car.systembar.privacy.cast.PrivacyChipCastModule;
+import com.android.systemui.car.systembar.privacy.mic.PrivacyChipMicModule;
+import com.android.systemui.car.systembar.privacy.share.PrivacyChipShareModule;
+import com.android.systemui.car.systembar.usernamepanel.UserNamePanelModule;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanelInfoRepository;
 import com.android.systemui.car.wm.scalableui.systemwindow.SystemUiWindowProvider;
@@ -69,8 +76,6 @@ import dagger.multibindings.StringKey;
 import java.util.Map;
 import java.util.Optional;
 
-import javax.inject.Provider;
-
 /**
  * Dagger injection module for {@link CarSystemBar}.
  *
@@ -78,7 +83,16 @@ import javax.inject.Provider;
  * extensions of SystemUI to override and provide their own implementations without replacing the
  * default system bar class.
  */
-@Module(includes = {FlexibleUiModule.class})
+@Module(includes = {
+        DebugPanelModule.class,
+        FlexibleUiModule.class,
+        HomeButtonModule.class,
+        PassengerHomeButtonModule.class,
+        PrivacyChipMicModule.class,
+        PrivacyChipCameraModule.class,
+        PrivacyChipCastModule.class,
+        PrivacyChipShareModule.class,
+        UserNamePanelModule.class})
 public abstract class CarSystemBarModule {
 
     @Provides
@@ -147,7 +161,6 @@ public abstract class CarSystemBarModule {
             ButtonSelectionStateController buttonSelectionStateController,
             ButtonRoleHolderController buttonRoleHolderController,
             SystemBarConfigs systemBarConfigs,
-            Provider<StatusIconPanelViewController.Builder> panelControllerBuilderProvider,
             // TODO(b/156052638): Should not need to inject LightBarController
             LightBarController lightBarController,
             DarkIconDispatcher darkIconDispatcher,
@@ -218,27 +231,6 @@ public abstract class CarSystemBarModule {
     public abstract CarSystemBarElementController.Factory bindDataSubscriptionUnseenIconController(
             DataSubscriptionUnseenIconController.Factory factory);
 
-    /** Injects UserNamePanelButtonViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(UserNamePanelButtonViewController.class)
-    public abstract CarSystemBarElementController.Factory bindUserNamePanelButtonViewController(
-            UserNamePanelButtonViewController.Factory factory);
-
-    /** Injects UserNameTextViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(UserNameTextViewController.class)
-    public abstract CarSystemBarElementController.Factory bindUserNameTextViewController(
-            UserNameTextViewController.Factory factory);
-
-    /** Injects UserNameImageViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(UserNameImageViewController.class)
-    public abstract CarSystemBarElementController.Factory bindUserNameImageViewController(
-            UserNameImageViewController.Factory factory);
-
     /** Injects KeyguardSystemBarPresenter */
     @SysUISingleton
     @Provides
@@ -250,13 +242,6 @@ public abstract class CarSystemBarModule {
             return Optional.empty();
         }
     }
-
-    /** Injects DebugPanelButtonViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(DebugPanelButtonViewController.class)
-    public abstract CarSystemBarElementController.Factory bindDebugPanelButtonViewController(
-            DebugPanelButtonViewController.Factory factory);
 
     /** Injects CarSystemBarViewFactory */
     @SysUISingleton
@@ -313,35 +298,6 @@ public abstract class CarSystemBarModule {
     public abstract CarSystemBarElementController.Factory bindCarSystemBarButtonControllerFactory(
             CarSystemBarButtonController.Factory factory);
 
-    /** Injects MicPrivacyChipViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(MicPrivacyChipViewController.class)
-    public abstract CarSystemBarElementController.Factory bindMicChipViewControllerFactory(
-            MicPrivacyChipViewController.Factory factory);
-
-    /** Injects CameraPrivacyChipViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(CameraPrivacyChipViewController.class)
-    public abstract CarSystemBarElementController.Factory bindCameraChipViewControllerFactory(
-            CameraPrivacyChipViewController.Factory factory);
-
-    /** Injects ShareToAppPrivacyChipViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(ShareToAppPrivacyChipViewController.class)
-    public abstract CarSystemBarElementController.Factory bindShareToAppChipViewControllerFactory(
-            ShareToAppPrivacyChipViewController.Factory factory);
-
-    /** Injects CastToOtherDevicePrivacyChipViewController */
-    @Binds
-    @IntoMap
-    @ClassKey(CastToOtherDevicePrivacyChipViewController.class)
-    public abstract CarSystemBarElementController.Factory
-            bindCastToOtherDeviceChipViewControllerFactory(
-                    CastToOtherDevicePrivacyChipViewController.Factory factory);
-
     /** Injects NotificationButtonController */
     @Binds
     @IntoMap
@@ -363,20 +319,6 @@ public abstract class CarSystemBarModule {
     public abstract CarSystemBarElementController.Factory
             bindTemperatureControlViewControllerFactory(
                     TemperatureControlViewController.Factory factory);
-
-    /** Injects HomeButtonController */
-    @Binds
-    @IntoMap
-    @ClassKey(HomeButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindHomeButtonControllerFactory(
-            HomeButtonController.Factory factory);
-
-    /** Injects PassengerHomeButtonController */
-    @Binds
-    @IntoMap
-    @ClassKey(PassengerHomeButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindPassengerHomeButtonControllerFactory(
-            PassengerHomeButtonController.Factory factory);
 
     /** Injects ControlCenterButtonController */
     @Binds

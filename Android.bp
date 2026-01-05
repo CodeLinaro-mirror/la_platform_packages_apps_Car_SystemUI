@@ -14,8 +14,6 @@
 // limitations under the License.
 //
 
-subdirs = ["pods"]
-
 package {
     default_applicable_licenses: ["Android-Apache-2.0"],
     default_team: "trendy_team_system_experience",
@@ -59,6 +57,21 @@ carsystemui_srcs = [
     "src/**/*.kt",
     "src/**/I*.aidl",
     ":statslog-carsystemui-java-gen",
+]
+
+carsysui_pods = [
+    // pods go here
+    "CarSystemUI-Hvac-Controller",
+    "CarSystemUI-Hvac-UI",
+    "CarSystemUI-SystemBar-DebugPanel",
+    "CarSystemUI-SystemBar-HomeButton",
+    "CarSystemUI-SystemBar-PassengerHomeButton",
+    "CarSystemUI-SystemBar-PrivacyChip-Base",
+    "CarSystemUI-SystemBar-PrivacyChip-Camera",
+    "CarSystemUI-SystemBar-PrivacyChip-Cast",
+    "CarSystemUI-SystemBar-PrivacyChip-Mic",
+    "CarSystemUI-SystemBar-PrivacyChip-Share",
+    "CarSystemUI-SystemBar-UserNamePanel",
 ]
 
 java_defaults {
@@ -140,13 +153,16 @@ android_library {
 
     static_libs: [
         "CarSystemUI-Shared",
-        // pods go here
-    ],
+    ] + carsysui_pods,
 
     libs: [
         "android.car",
     ],
     enforce_uses_libs: false,
+
+    kotlincflags: [
+        "-J-Xmx12288M",
+    ],
 
     javacflags: ["-Adagger.fastInit=enabled"],
     plugins: ["dagger2-compiler"],
@@ -206,11 +222,8 @@ android_app {
         proguard_flags_files: [
             "proguard.flags",
         ],
+        included_proguard_flags_files: [":sysui_proguard_common_and_kotlin"],
     },
-    // TODO(b/301283770): Compiling CarSystemUI should not require -J-Xmx8192M
-    javacflags: [
-        "-J-Xmx8192M",
-    ],
     dxflags: ["--multi-dex"],
 
     aaptflags: [
@@ -275,7 +288,6 @@ android_library {
     ],
     static_libs: [
         "CarSystemUI-Shared",
-        "CarSystemUI-FlexibleUI",
         "SystemUI-tests-base",
         "CarNotificationLib",
         "android.car.test.utils",
@@ -295,7 +307,7 @@ android_library {
         "//external/kotlinc:kotlin-annotations",
         "Car-WindowManager-Shell",
         "oem-token-lib",
-    ],
+    ] + carsysui_pods,
 
     libs: [
         "token-shared-lib-prebuilt",
@@ -312,13 +324,8 @@ android_library {
         "tests/src/**/*.java",
         "tests/src/**/*.kt",
         ":CarSystemUI-tests-multivalent",
-        "src/**/*.java",
-        "src/**/*.kt",
-        "src/**/I*.aidl",
-        ":statslog-carsystemui-java-gen",
+        ":CarSystemUI-application-srcs",
     ],
-
-    kotlin_lang_version: "1.9",
 
     static_libs: [
         "SystemUI-tests",
@@ -362,11 +369,6 @@ android_app {
     ],
     manifest: "tests/AndroidManifest-base.xml",
 
-    srcs: [
-        "src/**/*.java",
-        "src/**/*.kt",
-        "src/**/I*.aidl",
-    ],
     static_libs: [
         "//frameworks/libs/systemui:compilelib",
         "CarSystemUI-tests-base",
@@ -395,6 +397,7 @@ android_app {
         shrink_resources: false,
         optimized_shrink_resources: false,
         proguard_flags_files: ["proguard.flags"],
+        included_proguard_flags_files: [":sysui_proguard_common_and_kotlin"],
     },
 
     plugins: ["dagger2-compiler"],
@@ -470,5 +473,13 @@ filegroup {
         "multivalentTests/src/**/*.kt",
         "multivalentTests/src/**/*.java",
         "tests/utils/src/com/android/systemui/*.java",
+    ],
+}
+
+filegroup {
+    name: "CarSystemUI-proguard-deps",
+    srcs: [
+        "proguard.flags",
+        ":sysui_proguard_common_and_kotlin",
     ],
 }

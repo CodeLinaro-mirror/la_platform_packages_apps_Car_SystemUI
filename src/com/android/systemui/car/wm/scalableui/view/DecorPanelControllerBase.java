@@ -35,12 +35,14 @@ public abstract class DecorPanelControllerBase implements DecorPanelController {
     private static final boolean DEBUG = true;
     @Nullable
     private final Provider<View> mViewProvider;
+    protected final String mPanelId;
     @Nullable
     private View mView;
     protected final PanelControllerMetadata mMetadata;
 
-    protected DecorPanelControllerBase(PanelControllerMetadata metadata,
+    protected DecorPanelControllerBase(@NonNull String panelId, PanelControllerMetadata metadata,
             Map<Class<?>, Provider<View>> decorPanelViewMap) {
+        mPanelId = panelId;
         mMetadata = metadata;
         String viewName = metadata.getStringConfiguration(VIEW_TAG);
         if (viewName == null) {
@@ -65,11 +67,12 @@ public abstract class DecorPanelControllerBase implements DecorPanelController {
 
     @Nullable
     private View initView() {
+        View view = null;
         if (mViewProvider != null) {
-            return mViewProvider.get();
+            view = mViewProvider.get();
         }
-
-        return null;
+        logIfDebuggable("Get View " + view + ", with panel provider " + mViewProvider);
+        return view;
     }
 
     @Override
@@ -81,7 +84,14 @@ public abstract class DecorPanelControllerBase implements DecorPanelController {
     @Nullable
     public View getView() {
         mView = mView == null ? initView() : mView;
+        logIfDebuggable("getView =" + mView);
         return mView;
+    }
+
+    @Override
+    public void destroy() {
+        mView = null;
+        logIfDebuggable(mPanelId + ", getView =" + mView);
     }
 
     @Override
@@ -89,9 +99,9 @@ public abstract class DecorPanelControllerBase implements DecorPanelController {
         mView = initView();
     }
 
-    protected static void logIfDebuggable(String msg) {
+    protected void logIfDebuggable(String msg) {
         if (DEBUG) {
-            Log.d(TAG, msg);
+            Log.d(TAG, mPanelId + ", " + msg);
         }
     }
 }

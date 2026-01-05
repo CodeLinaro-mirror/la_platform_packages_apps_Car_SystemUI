@@ -19,7 +19,6 @@ package com.android.systemui.car.systembar;
 import static android.content.Intent.ACTION_OVERLAY_CHANGED;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
 
-import static com.android.systemui.car.Flags.configAwareSystemui;
 import static com.android.systemui.car.systembar.CarSystemBarViewController.BUTTON_TYPE_KEYGUARD;
 import static com.android.systemui.car.systembar.CarSystemBarViewController.BUTTON_TYPE_NAVIGATION;
 import static com.android.systemui.car.systembar.CarSystemBarViewController.BUTTON_TYPE_OCCLUSION;
@@ -281,7 +280,7 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
      */
     @Override
     public void setImeWindowStatus(int displayId, int visibility, int backDisposition,
-            boolean showImeSwitcher) {
+            boolean showImeSwitcherButton) {
         if (mContext.getDisplayId() != displayId) {
             return;
         }
@@ -598,7 +597,7 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
                     result.mPackageName, result.mLetterboxDetails);
 
             setImeWindowStatus(mDisplayId, result.mImeWindowVis, result.mImeBackDisposition,
-                    result.mShowImeSwitcher);
+                    result.mShowImeSwitcherButton);
 
             // Set up the initial icon state
             int numIcons = result.mIcons.size();
@@ -612,7 +611,7 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
         // Try setting up the initial state of the nav bar if applicable.
         if (result != null) {
             setImeWindowStatus(mDisplayTracker.getDefaultDisplayId(), result.mImeWindowVis,
-                    result.mImeBackDisposition, result.mShowImeSwitcher);
+                    result.mImeBackDisposition, result.mShowImeSwitcherButton);
         }
 
         createNavBar();
@@ -666,12 +665,6 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
     }
 
     private void registerOverlayChangeBroadcastReceiver() {
-        if (!configAwareSystemui()) {
-            if (DEBUG) {
-                Log.d(TAG, "Ignore overlay change for car systemui");
-            }
-            return;
-        }
         IntentFilter overlayFilter = new IntentFilter(ACTION_OVERLAY_CHANGED);
         overlayFilter.addDataScheme(OVERLAY_FILTER_DATA_SCHEME);
         overlayFilter.addDataSchemeSpecificPart(mContext.getPackageName(),
@@ -679,11 +672,9 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                mSystemBarAttachedMap.values().forEach(enabled -> {
-                    if (enabled) {
-                        restartSystemBars();
-                    }
-                });
+                if (mSystemBarAttachedMap.containsValue(true)) {
+                    restartSystemBars();
+                }
             }
         };
         mContext.registerReceiver(receiver, overlayFilter, /* broadcastPermission= */
