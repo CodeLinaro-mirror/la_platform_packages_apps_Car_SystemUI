@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.car.scalableui.model.Corner;
 import com.android.car.scalableui.model.Variant;
 import com.android.car.scalableui.panel.DecorPanelController;
 import com.android.car.scalableui.panel.Panel;
@@ -37,6 +38,7 @@ import com.android.wm.shell.automotive.AutoSurfaceTransaction;
 import com.android.wm.shell.automotive.AutoSurfaceTransactionFactory;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.shared.annotations.ExternalMainThread;
+import com.android.wm.shell.shared.annotations.ShellMainThread;
 
 import dagger.assisted.Assisted;
 import dagger.assisted.AssistedFactory;
@@ -54,7 +56,7 @@ public final class DecorPanel extends SysUIPanel {
     private final AutoDecorManager mAutoDecorManager;
     private final PanelUtils mPanelUtils;
     private final PanelControllerInitializer mPanelControllerInitializer;
-    private final ShellExecutor mMainExecutor;
+
     private final AutoSurfaceTransactionFactory mAutoSurfaceTransactionFactory;
     @VisibleForTesting
     AutoDecor mAutoDecor;
@@ -71,15 +73,15 @@ public final class DecorPanel extends SysUIPanel {
             PanelUtils panelUtils,
             PanelControllerInitializer panelControllerInitializer,
             @ExternalMainThread ShellExecutor mainExecutor,
+            @ShellMainThread ShellExecutor shellMainExecutor,
             AutoSurfaceTransactionFactory autoSurfaceTransactionFactory,
             Optional<PanelUpdatePublisher> panelUpdatePublisherOptional,
             @Assisted String id
     ) {
-        super(context, id, panelUpdatePublisherOptional);
+        super(context, id, panelUpdatePublisherOptional, mainExecutor, shellMainExecutor);
         mAutoDecorManager = autoDecorManager;
         mPanelUtils = panelUtils;
         mPanelControllerInitializer = panelControllerInitializer;
-        mMainExecutor = mainExecutor;
         mAutoSurfaceTransactionFactory = autoSurfaceTransactionFactory;
     }
 
@@ -107,9 +109,10 @@ public final class DecorPanel extends SysUIPanel {
 
     @Override
     public void destroy() {
-        mMainExecutor.execute(() -> {
+        getShellMainExecutor().execute(() -> {
             if (mAutoDecor != null) {
                 mAutoDecorManager.removeAutoDecor(mAutoDecor);
+                mAutoDecor = null;
             }
         });
         if (mDecorPanelController != null) {
@@ -121,35 +124,44 @@ public final class DecorPanel extends SysUIPanel {
     @Override
     public void reset() {
         super.reset();
-        // Only modify the view and window on the main thread to prevent thread-based exceptions
-        mMainExecutor.execute(() -> {
-            // Remove existing autoDecor that holds the view.
-            if (mAutoDecor != null) {
-                mAutoDecorManager.removeAutoDecor(mAutoDecor);
-            }
-            // Reinflate and reattach the view.
-            mDecorView = inflateDecorView();
-            if (mDecorView == null) {
-                Log.e(TAG, "DecorView is null, fail to create AutoDecor, " + getPanelId());
-                return;
-            }
-            Variant currentVariant = mPanelUtils.getCurrentVariant(getPanelId());
-            mAutoDecor = mAutoDecorManager.createAutoDecor(mDecorView,
-                    currentVariant != null ? currentVariant.getLayer() : getLayer(),
-                    currentVariant != null ? currentVariant.getBounds() : getBounds(),
-                    getPanelId());
+        // modify the view on the main thread and AutoDecor on the shell main thread
+        getMainExecutor().execute(() -> {
+            // View inflation has to be on main thread.
+            View newDecorView = inflateDecorView();
 
-            mAutoDecorManager.attachAutoDecorToDisplay(mAutoDecor, getDisplayId());
+            // AutoDecorManager related call should be on shellMainThread
+            getShellMainExecutor().execute(() -> {
+                if (mAutoDecor != null) {
+                    mAutoDecorManager.removeAutoDecor(mAutoDecor);
+                    mAutoDecor = null;
+                }
 
-            AutoSurfaceTransaction autoSurfaceTransaction = mAutoSurfaceTransactionFactory
-                    .createTransaction(RESET_TRANSACTION + getPanelId());
+                mDecorView = newDecorView;
+                if (mDecorView == null) {
+                    Log.e(TAG, "DecorView is null, fail to create AutoDecor, " + getPanelId());
+                    return;
+                }
 
-            update(autoSurfaceTransaction, currentVariant, /* updateChildren= */ true);
-            autoSurfaceTransaction.apply();
+                Variant currentVariant = mPanelUtils.getCurrentVariant(getPanelId());
+
+                mAutoDecor = mAutoDecorManager.createAutoDecor(mDecorView,
+                        currentVariant != null ? currentVariant.getLayer() : getLayer(),
+                        currentVariant != null ? currentVariant.getBounds() : getBounds(),
+                        getPanelId());
+
+                mAutoDecorManager.attachAutoDecorToDisplay(mAutoDecor, getDisplayId());
+
+                AutoSurfaceTransaction autoSurfaceTransaction = mAutoSurfaceTransactionFactory
+                        .createTransaction(RESET_TRANSACTION + getPanelId());
+
+                update(autoSurfaceTransaction, currentVariant, /* updateChildren= */ true);
+                autoSurfaceTransaction.apply();
+            });
         });
     }
 
     @Override
+    @ExternalMainThread
     public void refreshTheme() {
         super.refreshTheme();
         if (mDecorPanelController != null) {
@@ -196,8 +208,16 @@ public final class DecorPanel extends SysUIPanel {
                 variant == null ? isVisible() : variant.isVisible());
         autoSurfaceTransaction.setZOrder(getAutoDecor(),
                 variant == null ? getLayer() : variant.getLayer());
-        autoSurfaceTransaction.setCornerRadius(getAutoDecor(),
-                variant == null ? getCornerRadius() : variant.getCornerRadius());
+        Corner radius = variant == null ? getCornerRadius() : variant.getCornerRadius();
+        if (com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii()) {
+            autoSurfaceTransaction.setCornerRadius(getAutoDecor(),
+                    radius.getTopLeftRadius(), radius.getTopRightRadius(),
+                    radius.getBottomLeftRadius(), radius.getBottomRightRadius());
+        } else {
+            // Per-corner radius is not supported, applying a uniform radius to all corners.
+            // Note: we could use any Corner#getRadius*(), as they will be the same.
+            autoSurfaceTransaction.setCornerRadius(getAutoDecor(), radius.getTopLeftRadius());
+        }
         autoSurfaceTransaction.setCrop(getAutoDecor(),
                 new Rect(0, 0, bounds.width(), bounds.height()));
         autoSurfaceTransaction.setAlpha(getAutoDecor(),

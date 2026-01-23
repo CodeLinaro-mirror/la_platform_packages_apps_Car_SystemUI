@@ -39,38 +39,16 @@ constructor(
     val fullscreenButton: Button?
     val aspectRatioButton: Button?
     val closeButton: Button?
-
-    /** A listener to be invoked when the back button is clicked. */
-    var onBackButtonClick: (() -> Unit)? = null
-
-    /** A listener to be invoked when the fullscreen button is clicked. */
-    var onFullscreenButtonClick: (() -> Unit)? = null
-
-    /** A listener to be invoked when the aspect ratio button is clicked. */
-    var onAspectRatioButtonClick: (() -> Unit)? = null
-
-    /** A listener to be invoked when the close button is clicked. */
-    var onCloseButtonClick: (() -> Unit)? = null
+    val displayDensityButton: Button?
 
     init {
         inflate(context, R.layout.tasktoolbar, this)
 
-        backButton = findViewById<Button>(R.id.back_button)?.apply {
-            setOnClickListener { onBackButtonClick?.invoke() }
-        }
-        fullscreenButton = findViewById<Button>(R.id.fullscreen_button)?.apply {
-            if (context.resources.getBoolean(R.bool.show_toolbar_fullscreen_button)) {
-                setOnClickListener { onFullscreenButtonClick?.invoke() }
-            } else {
-                visibility = GONE
-            }
-        }
-        aspectRatioButton = findViewById<Button>(R.id.aspect_ratio)?.apply {
-            setOnClickListener { onAspectRatioButtonClick?.invoke() }
-        }
-        closeButton = findViewById<Button>(R.id.close_window)?.apply {
-            setOnClickListener { onCloseButtonClick?.invoke() }
-        }
+        backButton = findViewById<Button>(R.id.back_button)
+        fullscreenButton = findViewById<Button>(R.id.fullscreen_button)
+        aspectRatioButton = findViewById<Button>(R.id.aspect_ratio)
+        displayDensityButton = findViewById<Button>(R.id.display_density)
+        closeButton = findViewById<Button>(R.id.close_window)
         CompatibilityToolbarUiState.logIfDebuggable("Toolbar init")
     }
 }
