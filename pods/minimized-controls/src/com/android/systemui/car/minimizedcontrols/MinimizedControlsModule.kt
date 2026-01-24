@@ -17,4 +17,5 @@
 package com.android.systemui.car.minimizedcontrols
 
 /** Dagger module for minimized controls. */
+
 abstract class MinimizedControlsModule
