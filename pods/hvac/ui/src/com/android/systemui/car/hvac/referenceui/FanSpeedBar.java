@@ -31,11 +31,11 @@ import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import com.android.systemui.R;
 import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.car.hvac.HvacPropertySetter;
 import com.android.systemui.car.hvac.HvacUtils;
 import com.android.systemui.car.hvac.HvacView;
+import com.android.systemui.car.hvac.ui.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -244,8 +244,10 @@ public class FanSpeedBar extends RelativeLayout implements HvacView {
     }
 
     private void setOffAndMaxButtonsActiveState(int fanSpeed) {
-        setOffButtonActive(fanSpeed == mMinFanSpeedSupportedByUi);
-        setMaxButtonActive(fanSpeed == mMaxFanSpeedSupportedByUi);
+        mContext.getMainExecutor().execute(() -> {
+            setOffButtonActive(fanSpeed == mMinFanSpeedSupportedByUi);
+            setMaxButtonActive(fanSpeed == mMaxFanSpeedSupportedByUi);
+        });
     }
 
     private void setMaxButtonActive(boolean active) {
@@ -279,7 +281,9 @@ public class FanSpeedBar extends RelativeLayout implements HvacView {
     }
 
     private void updateViewPerAvailability() {
-        setAlpha(shouldAllowControl() ? mOnAlpha : mOffAlpha);
+        mContext.getMainExecutor().execute(() -> {
+            setAlpha(shouldAllowControl() ? mOnAlpha : mOffAlpha);
+        });
     }
 
     private boolean shouldAllowControl() {

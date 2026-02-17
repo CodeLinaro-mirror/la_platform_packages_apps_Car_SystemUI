@@ -16,83 +16,27 @@
 
 package com.android.systemui.car.qc;
 
-import com.android.car.qc.provider.BaseLocalQCProvider;
-import com.android.systemui.car.flexibleui.CarSystemBarElementController;
-import com.android.systemui.car.statusicon.ui.MobileSignalStatusIconController;
-import com.android.systemui.car.statusicon.ui.WifiSignalStatusIconController;
+import com.android.systemui.car.qc.base.QCBaseModule;
+import com.android.systemui.car.qc.base.SystemUIQCViewController;
+import com.android.systemui.car.qc.footer.base.QCFooterBaseModule;
+import com.android.systemui.car.qc.footer.logout.QCLogoutModule;
+import com.android.systemui.car.qc.footer.screenoff.QCScreenOffModule;
+import com.android.systemui.car.qc.footer.userpicker.QCUserPickerModule;
+import com.android.systemui.car.qc.profileswitcher.QCProfileSwitcherModule;
 import com.android.systemui.car.systembar.privacy.camera.CameraQcPanelModule;
 import com.android.systemui.car.systembar.privacy.mic.MicQcPanelModule;
 
-import dagger.Binds;
 import dagger.Module;
-import dagger.multibindings.ClassKey;
-import dagger.multibindings.IntoMap;
 
 /**
  * Dagger injection module for {@link SystemUIQCViewController}
  */
-@Module(includes = {MicQcPanelModule.class, CameraQcPanelModule.class})
-public abstract class QuickControlsModule {
-    /** Injects ProfileSwitcher. */
-    @Binds
-    @IntoMap
-    @ClassKey(ProfileSwitcher.class)
-    public abstract BaseLocalQCProvider bindProfileSwitcher(
-            ProfileSwitcher profileSwitcher);
-
-    /** Injects MobileSignalStatusIconController. */
-    @Binds
-    @IntoMap
-    @ClassKey(MobileSignalStatusIconController.class)
-    public abstract CarSystemBarElementController.Factory bindMobileSignalStatusIconController(
-            MobileSignalStatusIconController.Factory mobileSignalStatusIconController);
-
-    /** Injects WifiSignalStatusIconController. */
-    @Binds
-    @IntoMap
-    @ClassKey(WifiSignalStatusIconController.class)
-    public abstract CarSystemBarElementController.Factory bindWifiSignalStatusIconController(
-            WifiSignalStatusIconController.Factory wifiSignalStatusIconController);
-
-    /** Injects SystemUIQCViewController. */
-    @Binds
-    @IntoMap
-    @ClassKey(SystemUIQCViewController.class)
-    public abstract CarSystemBarElementController.Factory bindQCViewControllerFactory(
-            SystemUIQCViewController.Factory factory);
-
-    /** Injects QCFooterButtonController. */
-    @Binds
-    @IntoMap
-    @ClassKey(QCFooterButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindQCFooterButtonControllerFactory(
-            QCFooterButtonController.Factory factory);
-
-    /** Injects QCFooterViewController. */
-    @Binds
-    @IntoMap
-    @ClassKey(QCFooterViewController.class)
-    public abstract CarSystemBarElementController.Factory bindQCFooterViewControllerFactory(
-            QCFooterViewController.Factory factory);
-
-    /** Injects QCLogoutButtonController. */
-    @Binds
-    @IntoMap
-    @ClassKey(QCLogoutButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindQCLogoutButtonControllerFactory(
-            QCLogoutButtonController.Factory factory);
-
-    /** Injects QCScreenOffButtonController. */
-    @Binds
-    @IntoMap
-    @ClassKey(QCScreenOffButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindQCScreenOffButtonControllerFactory(
-            QCScreenOffButtonController.Factory factory);
-
-    /** Injects QCUserPickerButtonController. */
-    @Binds
-    @IntoMap
-    @ClassKey(QCUserPickerButtonController.class)
-    public abstract CarSystemBarElementController.Factory bindQCUserPickerButtonControllerFactory(
-            QCUserPickerButtonController.Factory factory);
-}
+@Module(includes = {CameraQcPanelModule.class,
+        MicQcPanelModule.class,
+        QCBaseModule.class,
+        QCFooterBaseModule.class,
+        QCLogoutModule.class,
+        QCProfileSwitcherModule.class,
+        QCScreenOffModule.class,
+        QCUserPickerModule.class})
+public abstract class QuickControlsModule {}

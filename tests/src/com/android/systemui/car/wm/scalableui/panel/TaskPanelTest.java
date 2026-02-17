@@ -100,6 +100,7 @@ public class TaskPanelTest extends CarSysuiTestCase {
     private TaskPanel mTaskPanel;
     private ShellExecutor mMainExecutor;
     private ShellExecutor mShellMainThread;
+    private ShellExecutor mShellBgExecutor;
     private RootTaskStackListener mRootTaskStackListener;
 
     @Mock
@@ -152,12 +153,13 @@ public class TaskPanelTest extends CarSysuiTestCase {
         MockitoAnnotations.initMocks(this);
         mMainExecutor = new ShellSyncExecutor();
         mShellMainThread = new ShellSyncExecutor();
+        mShellBgExecutor = new ShellSyncExecutor();
         mTaskPanel = spy(
                 new TaskPanel(mAutoTaskStackController, mUserContext, mCarServiceProvider,
                         mAutoTaskStackHelper, mShellTaskOrganizer, mAutoCaptionController,
                         mPanelUtils, mTaskPanelInfoRepository, mAutoDecorManager, mEventDispatcher,
                         mPanelControllerInitializer, mAutoLayoutManager,
-                        mMainExecutor, mShellMainThread,
+                        mMainExecutor, mShellMainThread, mShellBgExecutor,
                         mAutoSurfaceTransactionFactory, Optional.of(mPanelUpdatePublisher),
                         mFlagManager,
                         TASK_PANEL_ID));
@@ -213,17 +215,6 @@ public class TaskPanelTest extends CarSysuiTestCase {
 
         // Called 2 twice due to handlePanelEmpty and delay inside scheduleRestartAttempt.
         verify(mTaskPanel, times(2)).scheduleRestartAttempt(mRunningTaskInfo);
-    }
-
-    @Test
-    public void handlePanelEmpty_withoutRestartInvisible_reportsEmpty() {
-        doReturn(false).when(mTaskPanel).hasRestart();
-        mTaskPanel.setVisibility(false);
-        mTaskPanel.handlePanelEmpty(mRunningTaskInfo);
-
-        ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
-        verify(mEventDispatcher).executeEvent(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().getPanelId()).isEqualTo(TASK_PANEL_ID);
     }
 
     @Test

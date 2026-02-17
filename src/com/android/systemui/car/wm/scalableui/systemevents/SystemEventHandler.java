@@ -27,25 +27,31 @@ import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventCon
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_USER_AUTHENTICATED_EVENT_ID;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_USER_SWITCH_COMPLETE_EVENT_ID;
 import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_USER_SWITCH_ON_AUTHENTICATED_TOKEN_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_UXR_RESTRICTED_TOKEN_ID;
+import static com.android.systemui.car.wm.scalableui.systemevents.SystemEventConstants.SYSTEM_UXR_STATE_CHANGED_EVENT_ID;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
+import android.car.drivingstate.CarUxRestrictions;
 import android.car.user.CarUserManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.os.Build;
+import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
 import android.view.Display;
 
 import androidx.annotation.NonNull;
 
+
 import com.android.car.scalableui.manager.StateManager;
 import com.android.car.scalableui.model.Event;
 import com.android.car.scalableui.panel.Panel;
 import com.android.car.scalableui.panel.PanelPool;
+import com.android.car.ui.utils.CarUxRestrictionsUtil;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.CarDeviceProvisionedListener;
@@ -98,6 +104,7 @@ public class SystemEventHandler implements CoreStartable,
     private final CarDeviceProvisionedController mCarDeviceProvisionedController;
     private final EventDispatcher mEventDispatcher;
     private final FlagManager mFlagManager;
+    private final CarUxRestrictionsUtil mCarUxRestrictionsUtil;
 
     private CarUserManager mCarUserManager;
     private boolean mIsUserSetupInProgress;
@@ -105,6 +112,7 @@ public class SystemEventHandler implements CoreStartable,
     private boolean mResetCalledForUser = false;
     private boolean mIsUserSwitching = true;
     private boolean mIsKeyguardShowing;
+    private boolean mIsUxrRestricted;
     private Configuration mConfiguration;
 
     private final CarUserManager.UserLifecycleListener mUserLifecycleListener =
@@ -127,29 +135,7 @@ public class SystemEventHandler implements CoreStartable,
                         mResetCalledForUser = false;
                         mIsUserSwitching = true;
                     } else if (event.getEventType() == USER_LIFECYCLE_EVENT_TYPE_UNLOCKED) {
-                        if (shouldResetPanels()) {
-                            logIfDebuggable("Resetting panels during user unlock");
-                            if (!Flags.homeActivityAlwaysPresent()) {
-                                Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-                                homeIntent.addCategory(Intent.CATEGORY_HOME);
-                                homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                ActivityOptions options = ActivityOptions.makeBasic();
-                                options.setAvoidMoveToFront();
-                                mContext.startActivityAsUser(homeIntent, options.toBundle(),
-                                        mUserTracker.getUserHandle());
-                            }
-                            StateManager.handlePanelReset();
-                            mResetCalledForUser = true;
-                        } else {
-                            logIfDebuggable("Received user unlock while user is not setup");
-                        }
-
-                        handleSuwLaunchIfNecessary(event.getUserId());
-
-                        if (!mIsKeyguardShowing) {
-                            mEventDispatcher.executeEvent(getUserAuthEvent());
-                            mIsUserSwitching = false;
-                        }
+                        handleUserUnlocked(event.getUserHandle());
                     } else {
                         Log.i(TAG, "Ignore system event" + event.getEventType());
                     }
@@ -205,6 +191,22 @@ public class SystemEventHandler implements CoreStartable,
                 }
             };
 
+    private final CarUxRestrictionsUtil.OnUxRestrictionsChangedListener mUxrListener =
+            new CarUxRestrictionsUtil.OnUxRestrictionsChangedListener() {
+                @Override
+                public void onRestrictionsChanged(@NonNull CarUxRestrictions carUxRestrictions) {
+                    boolean restricted = carUxRestrictions.isRequiresDistractionOptimization();
+                    if (mIsUxrRestricted == restricted) {
+                        return;
+                    }
+                    mIsUxrRestricted = restricted;
+                    mEventDispatcher.executeEvent(getEventWithDisplays(
+                            new Event.Builder(SYSTEM_UXR_STATE_CHANGED_EVENT_ID).addToken(
+                                    SYSTEM_UXR_RESTRICTED_TOKEN_ID,
+                                    Boolean.toString(mIsUxrRestricted))));
+                }
+            };
+
     @Inject
     public SystemEventHandler(
             Context context,
@@ -217,7 +219,8 @@ public class SystemEventHandler implements CoreStartable,
             KeyguardStateController keyguardStateController,
             CarDeviceProvisionedController carDeviceProvisionedController,
             EventDispatcher dispatcher,
-            FlagManager flagManager
+            FlagManager flagManager,
+            CarUxRestrictionsUtil carUxRestrictionsUtil
     ) {
         mContext = context;
         mUserManager = userManager;
@@ -230,6 +233,7 @@ public class SystemEventHandler implements CoreStartable,
         mCarDeviceProvisionedController = carDeviceProvisionedController;
         mEventDispatcher = dispatcher;
         mFlagManager = flagManager;
+        mCarUxRestrictionsUtil = carUxRestrictionsUtil;
         // Make a copy of current Configuration
         mConfiguration = new Configuration(mContext.getResources().getConfiguration());
     }
@@ -272,6 +276,7 @@ public class SystemEventHandler implements CoreStartable,
             mUserTracker.addCallback(mUserTrackerCallback, mBackgroundExecutor);
             mDisplayStateHelper.get().addListener(mDisplayStateListener);
             registerKeyguardStateListener();
+            registerUxrListener();
         }
     }
 
@@ -289,6 +294,38 @@ public class SystemEventHandler implements CoreStartable,
             notifySuwStateEvent();
         }
         mCarDeviceProvisionedController.addCallback(mCarDeviceProvisionedListener);
+    }
+
+    private void handleUserUnlocked(UserHandle userHandle) {
+        if (userHandle.isSystem()) {
+            return;
+        }
+        int userId = userHandle.getIdentifier();
+
+        if (shouldResetPanels()) {
+            logIfDebuggable("Resetting panels during user unlock");
+            if (!Flags.homeActivityAlwaysPresent()) {
+                Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+                homeIntent.addCategory(Intent.CATEGORY_HOME);
+                homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ActivityOptions options = ActivityOptions.makeBasic();
+                options.setAvoidMoveToFront();
+                mContext.startActivityAsUser(homeIntent, options.toBundle(),
+                        mUserTracker.getUserHandle());
+            }
+            StateManager.handlePanelReset();
+            mResetCalledForUser = true;
+        } else {
+            logIfDebuggable("Received user unlock while user is not setup");
+        }
+
+        handleSuwLaunchIfNecessary(userId);
+
+        if (mIsKeyguardShowing) {
+            return;
+        }
+        mEventDispatcher.executeEvent(getUserAuthEvent());
+        mIsUserSwitching = false;
     }
 
     private void handleSuwLaunchIfNecessary(int userId) {
@@ -325,13 +362,19 @@ public class SystemEventHandler implements CoreStartable,
         mCarServiceProvider.addListener(car -> {
             mCarUserManager = car.getCarManager(CarUserManager.class);
             if (mCarUserManager != null) {
+                UserHandle userHandle = mUserTracker.getUserHandle();
+                if (mUserManager.isUserUnlocked(userHandle)) {
+                    handleUserUnlocked(userHandle);
+                }
                 mCarUserManager.addListener(mBackgroundExecutor, mUserLifecycleListener);
             }
         });
     }
 
     private void registerKeyguardStateListener() {
-        mIsKeyguardShowing = isKeyguardShowing();
+        if (isKeyguardShowing()) {
+            keyguardShowingChanged(true);
+        }
         mKeyguardStateController.addCallback(new KeyguardStateController.Callback() {
             @Override
             public void onKeyguardShowingChanged() {
@@ -363,6 +406,18 @@ public class SystemEventHandler implements CoreStartable,
 
     private boolean isKeyguardShowing() {
         return mKeyguardStateController.isShowing();
+    }
+
+    private void registerUxrListener() {
+        mCarUxRestrictionsUtil.register(mUxrListener);
+        if (mCarUxRestrictionsUtil.getCurrentRestrictions().isRequiresDistractionOptimization()) {
+            // Send event for initial state
+            mIsUxrRestricted = true;
+            mEventDispatcher.executeEvent(getEventWithDisplays(
+                    new Event.Builder(SYSTEM_UXR_STATE_CHANGED_EVENT_ID).addToken(
+                            SYSTEM_UXR_RESTRICTED_TOKEN_ID,
+                            Boolean.toString(mIsUxrRestricted))));
+        }
     }
 
     private boolean shouldResetPanels() {

@@ -22,8 +22,6 @@ flag {
     bug: "341963483"
 }
 
-
-
 flag {
     name: "show_qc_sound_panel"
     namespace: "car_sys_exp"
@@ -33,6 +31,13 @@ flag {
 
 flag {
     name: "display_compatibility_v2"
+    namespace: "car_sys_exp"
+    description: "This flag controls v2 development to enable display compatibility feature."
+    bug: "364382110"
+}
+
+flag {
+    name: "display_compat_v2"
     namespace: "car_sys_exp"
     description: "This flag controls v2 development to enable display compatibility feature."
     bug: "364382110"
@@ -94,10 +99,16 @@ flag {
     bug: "435347522"
 }
 
-
 flag {
     name: "scalable_ui_minimized_controls"
     namespace: "car_sys_exp"
     description: "This flag controls enabling minimized controls"
     bug: "465164732"
+}
+
+flag {
+    name: "promoted_notifications"
+    namespace: "car_sys_exp"
+    description: "This flag controls enabling special handling of promoted notifications"
+    bug: "478878478"
 }

@@ -17,6 +17,7 @@
 package com.android.systemui.car.systembar.privacy.base;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -24,16 +25,15 @@ import android.view.View;
 import android.widget.ImageView;
 
 import androidx.annotation.AnyThread;
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.constraintlayout.motion.widget.MotionLayout;
 
-import com.android.systemui.R;
 import com.android.systemui.car.flexibleui.CarSystemBarElement;
 import com.android.systemui.car.flexibleui.CarSystemBarElementFlags;
 import com.android.systemui.car.flexibleui.CarSystemBarElementResolver;
+import com.android.systemui.car.shared.R;
 import com.android.systemui.car.systembar.panel.AnimatedStatusIcon;
 
 import java.util.concurrent.Executors;
@@ -80,6 +80,11 @@ public abstract class PrivacyChip extends MotionLayout implements AnimatedStatus
     private boolean mIsInflated;
     private boolean mIsSensorEnabled;
     private ScheduledExecutorService mExecutor;
+
+    private ImageView mLightMutedIcon;
+    private ImageView mDarkMutedIcon;
+    private ImageView mLightIcon;
+    private ImageView mDarkIcon;
 
     public PrivacyChip(@NonNull Context context) {
         this(context, /* attrs= */ null);
@@ -130,14 +135,11 @@ public abstract class PrivacyChip extends MotionLayout implements AnimatedStatus
         mCurrentTransitionState = AnimationStates.INVISIBLE;
         mIsInflated = true;
 
-        ImageView lightMutedIcon = requireViewById(R.id.light_muted_icon);
-        lightMutedIcon.setImageResource(getLightMutedIconResourceId());
-        ImageView darkMutedIcon = requireViewById(R.id.dark_muted_icon);
-        darkMutedIcon.setImageResource(getDarkMutedIconResourceId());
-        ImageView lightIcon = requireViewById(R.id.light_icon);
-        lightIcon.setImageResource(getLightIconResourceId());
-        ImageView darkIcon = requireViewById(R.id.dark_icon);
-        darkIcon.setImageResource(getDarkIconResourceId());
+        mLightMutedIcon = requireViewById(R.id.light_muted_icon);
+        mDarkMutedIcon = requireViewById(R.id.dark_muted_icon);
+        mLightIcon = requireViewById(R.id.light_icon);
+        mDarkIcon = requireViewById(R.id.dark_icon);
+        updateIcons();
 
         setTransitionListener(
                 new MotionLayout.TransitionListener() {
@@ -301,9 +303,20 @@ public abstract class PrivacyChip extends MotionLayout implements AnimatedStatus
                     getSensorNameWithFirstLetterCapitalized());
         } else {
             contentDescription = getResources().getString(
-                    R.string.ongoing_privacy_chip_content_multiple_apps, getSensorName());
+                    com.android.systemui.res.R.string.ongoing_privacy_chip_content_multiple_apps,
+                    getSensorName());
         }
         setContentDescription(contentDescription);
+    }
+
+    /**
+     * Call to update view icons if the returned icons in the overridden getters methods change.
+     */
+    protected void updateIcons() {
+        mLightIcon.setImageDrawable(getLightIconDrawable());
+        mLightMutedIcon.setImageDrawable(getLightMutedIconDrawable());
+        mDarkIcon.setImageDrawable(getDarkIconDrawable());
+        mDarkMutedIcon.setImageDrawable(getDarkMutedIconDrawable());
     }
 
     /**
@@ -612,13 +625,13 @@ public abstract class PrivacyChip extends MotionLayout implements AnimatedStatus
         return mDisableForLockTaskModeLocked;
     }
 
-    protected abstract @DrawableRes int getLightMutedIconResourceId();
+    protected abstract Drawable getLightMutedIconDrawable();
 
-    protected abstract @DrawableRes int getDarkMutedIconResourceId();
+    protected abstract Drawable getDarkMutedIconDrawable();
 
-    protected abstract @DrawableRes int getLightIconResourceId();
+    protected abstract Drawable getLightIconDrawable();
 
-    protected abstract @DrawableRes int getDarkIconResourceId();
+    protected abstract Drawable getDarkIconDrawable();
 
     protected abstract String getSensorName();
 

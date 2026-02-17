@@ -41,11 +41,12 @@ import android.view.Display;
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
 
+import com.android.car.oem.tokens.Token;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.systemui.CoreStartable;
-import com.android.systemui.R;
 import com.android.systemui.car.CarServiceProvider;
+import com.android.systemui.car.shared.R;
 import com.android.systemui.car.users.CarSystemUIUserUtil;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -236,11 +237,13 @@ public class PassengerKeyguardLoadingDialog implements CoreStartable {
     static class LoadingPresentation extends Presentation {
         LoadingPresentation(Context outerContext, Display display) {
             super(outerContext, display, /* theme= */ 0, TYPE_SYSTEM_DIALOG);
+            Token.applyOemTokenStyle(getContext());
         }
 
         @Override
         protected void onCreate(Bundle savedInstanceState) {
             super.onCreate(savedInstanceState);
+
             setContentView(R.layout.passenger_keyguard_loading_dialog);
         }
     }

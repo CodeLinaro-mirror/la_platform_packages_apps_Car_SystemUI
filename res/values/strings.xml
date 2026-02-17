@@ -16,28 +16,10 @@
   -->
 
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <!-- Format for HVAC temperature in fahrenheit (No decimal place) -->
-    <string name="hvac_temperature_format_fahrenheit" translatable="false">%.0f</string>
-    <!-- Format for HVAC temperature in celsius (One decimal place) -->
-    <string name="hvac_temperature_format_celsius" translatable="false">%.1f</string>
-    <!-- String to represent lowest setting of an HVAC system [CHAR LIMIT=10]-->
-    <string name="hvac_min_text">Min</string>
-    <!-- String to represent the highest setting of an HVAC system [CHAR LIMIT=10]-->
-    <string name="hvac_max_text">Max</string>
-    <!-- String to represent the highest setting of fan speed [CHAR LIMIT=10]-->
-    <string name="fan_speed_max">MAX</string>
-    <!-- String to represent fan being turned off [CHAR LIMIT=10]-->
-    <string name="fan_speed_off">OFF</string>
-    <!-- String to display when no HVAC temperature is available -->
-    <string name="hvac_null_temp_text" translatable="false">--</string>
-    <!-- String to display when the HVAC temperature control is turned off [CHAR LIMIT=10]-->
-    <string name="hvac_temperature_off">OFF</string>
     <!-- Text for voice recognition toast. [CHAR LIMIT=60] -->
     <string name="voice_recognition_toast">Voice recognition now handled by connected Bluetooth device</string>
     <!-- Title for button that adds a new profile. [CHAR LIMIT=30] -->
     <string name="car_add_user">Add a profile</string>
-    <!-- Title for button that ends current user session. [CHAR LIMIT=30] -->
-    <string name="end_session">End session</string>
     <!-- Default name of the new profile created. [CHAR LIMIT=30] -->
     <string name="car_new_user">New Profile</string>
     <!-- Title of the alert dialog to ask user to confirm creation of new profile. [CHAR LIMIT=30] -->
@@ -59,8 +41,6 @@
     <string name="car_loading_profile">Loading</string>
     <!-- Message to inform user that the new user profile is loading with additional information on the previous and the next user. [CHAR LIMIT=100] -->
     <string name="car_loading_profile_developer_message">Loading user (from <xliff:g id="from_user" example="10">%1$d</xliff:g> to <xliff:g id="to_user" example="12">%2$d</xliff:g>)</string>
-    <!-- Subtitle for current profile in profile switch panel [CHAR LIMIT=20]-->
-    <string name="current_profile_subtitle">Current profile</string>
 
     <!-- Accessibility content description for microphone/camera off state of privacy chip. [CHAR LIMIT=40]-->
     <string name="privacy_chip_off_content"><xliff:g id="sensor" example="Microphone">%1$s</xliff:g> is off.</string>
@@ -136,10 +116,6 @@
     <!-- Adjust temperature view raise temperature label-->
     <string name="hvac_increase_button_label">Raise temperature</string>
 
-    <!-- Status icon for signal settings in status bar-->
-    <string name="status_icon_signal_mobile">Signal Settings: Using Mobile Data</string>
-    <string name="status_icon_signal_wifi">Signal Settings: Wifi On</string>
-    <string name="status_icon_signal_hotspot">Signal Settings: Hotspot On</string>
     <!-- Status icon for display settings in status bar-->
     <string name="status_icon_display_status">Display Settings</string>
     <!-- Status icon for debug settings in status bar-->
@@ -284,8 +260,5 @@
     <!-- DisplayCompat fullscreen button [CHAR LIMIT=30] -->
     <string name="fullscreen">Full Screen</string>
     <string name="display_density_button_description">Display size</string>
-
-    <!-- Data subscription button text [CHAR LIMIT=30]-->
-    <string name="data_subscription_button_text">See plans</string>
 
 </resources>

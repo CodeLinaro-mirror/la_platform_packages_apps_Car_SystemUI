@@ -63,9 +63,30 @@ carsysui_pods = [
     // pods go here
     "CarSystemUI-Hvac-Controller",
     "CarSystemUI-Hvac-UI",
+    "CarSystemUI-Minimized-Controls",
+    "CarSystemUI-QC-DataSubscription",
+    "CarSystemUI-QC-Footer-Base",
+    "CarSystemUI-QC-Base",
+    "CarSystemUI-QC-Footer-Logout",
+    "CarSystemUI-QC-Footer-ScreenOff",
+    "CarSystemUI-QC-Footer-UserPicker",
+    "CarSystemUI-QC-ProfileSwitcher",
+    "CarSystemUI-StatusIcon-Base",
     "CarSystemUI-StatusIcon-Bluetooth",
+    "CarSystemUI-StatusIcon-Location",
+    "CarSystemUI-StatusIcon-MediaVolume",
+    "CarSystemUI-StatusIcon-Mobile",
+    "CarSystemUI-StatusIcon-PhoneCall",
+    "CarSystemUI-StatusIcon-Connectivity",
+    "CarSystemUI-StatusIcon-Wifi",
+    "CarSystemUI-SystemBar-AaosStudioButton",
+    "CarSystemUI-SystemBar-AppGridButton",
+    "CarSystemUI-SystemBar-AssistantButton",
+    "CarSystemUI-SystemBar-ControlCenterButton",
     "CarSystemUI-SystemBar-DebugPanel",
+    "CarSystemUI-SystemBar-Dock",
     "CarSystemUI-SystemBar-HomeButton",
+    "CarSystemUI-SystemBar-NotificationChip",
     "CarSystemUI-SystemBar-Panel",
     "CarSystemUI-SystemBar-PassengerHomeButton",
     "CarSystemUI-SystemBar-PrivacyChip-Base",
@@ -74,6 +95,7 @@ carsysui_pods = [
     "CarSystemUI-SystemBar-PrivacyChip-Mic",
     "CarSystemUI-SystemBar-PrivacyChip-Share",
     "CarSystemUI-SystemBar-UserNamePanel",
+    "CarSystemUI-SystemBar-Volume",
 ]
 
 java_defaults {
@@ -91,6 +113,7 @@ java_defaults {
 
     static_libs: [
         "CarSystemUI-FlexibleUI",
+        "dewd-res-core",
         "SystemUI-application",
         "SystemUI-core",
         "CarNotificationLib",
@@ -128,7 +151,6 @@ java_defaults {
         "//frameworks/libs/systemui:animationlib",
         "CarDockLib",
         "androidx.test.rules",
-        "car-data-subscription-lib",
         "Car-WindowManager-Shell",
         "oem-token-lib",
     ],
@@ -138,9 +160,6 @@ java_defaults {
         "token-shared-lib-prebuilt",
     ],
     enforce_uses_libs: false,
-
-    // TODO(b/319708040): re-enable use_resource_processor
-    use_resource_processor: false,
 }
 
 android_library {
@@ -162,11 +181,12 @@ android_library {
     ],
     enforce_uses_libs: false,
 
-    kotlincflags: [
-        "-J-Xmx12288M",
+    javacflags: [
+        "-Adagger.fastInit=enabled",
     ],
 
-    javacflags: ["-Adagger.fastInit=enabled"],
+    kotlincflags: ["-J-Xmx16384M"],
+
     plugins: ["dagger2-compiler"],
 }
 
@@ -182,11 +202,11 @@ android_library {
 
     manifest: "AndroidManifest-shared.xml",
 
-    javacflags: ["-Adagger.fastInit=enabled"],
-    plugins: ["dagger2-compiler"],
+    javacflags: [
+        "-Adagger.fastInit=enabled",
+    ],
 
-    // TODO(b/319708040): re-enable use_resource_processor
-    use_resource_processor: false,
+    plugins: ["dagger2-compiler"],
 }
 
 android_app {
@@ -241,9 +261,6 @@ android_app {
         "privapp_whitelist_com.android.systemui",
         "allowed_privapp_com.android.carsystemui",
     ],
-
-    // TODO(b/319708040): re-enable use_resource_processor
-    use_resource_processor: false,
 }
 
 // Begin daggervis
@@ -272,6 +289,11 @@ android_library {
     defaults: [
         "CarSystemUI-core-defaults",
     ],
+    srcs: [
+        ":CarSystemUI-application-srcs",
+    ],
+    manifest: "AndroidManifest-shared.xml",
+    static_libs: carsysui_pods,
     plugins: [
         "car-systemui-binding-graph-plugin",
         "dagger2-compiler",
@@ -304,7 +326,6 @@ android_library {
         "com_android_systemui_car_flags_lib",
         "com_android_car_scalableui_flags_lib",
         "CarDockLib",
-        "car-data-subscription-lib",
         "testng",
         "//external/kotlinc:kotlin-annotations",
         "Car-WindowManager-Shell",
@@ -315,13 +336,11 @@ android_library {
         "token-shared-lib-prebuilt",
     ],
     enforce_uses_libs: false,
-
 }
 
 android_library {
     name: "CarSystemUI-tests",
-    manifest: "tests/AndroidManifest-base.xml",
-    additional_manifests: ["tests/AndroidManifest.xml"],
+    manifest: "tests/AndroidManifest-tests.xml",
     srcs: [
         "tests/src/**/*.java",
         "tests/src/**/*.kt",
@@ -358,8 +377,6 @@ android_library {
     errorprone: {
         enabled: false,
     },
-    // TODO(b/319708040): re-enable use_resource_processor
-    use_resource_processor: false,
 }
 
 android_app {
@@ -403,20 +420,17 @@ android_app {
     },
 
     plugins: ["dagger2-compiler"],
-
-    // TODO(b/319708040): re-enable use_resource_processor
-    use_resource_processor: false,
 }
 
 android_robolectric_test {
     name: "CarSystemUIRoboTests",
     srcs: [
         ":SystemUI-robotest-utils",
-        ":SystemUI-tests-utils",
         ":CarSystemUI-tests-multivalent",
     ],
     static_libs: [
         "RoboTestLibraries",
+        "SystemUI_test_fixtures",
     ],
     libs: [
         "android.car",
@@ -440,19 +454,19 @@ android_robolectric_test {
 android_ravenwood_test {
     name: "CarSystemUIRavenTests",
     srcs: [
-        ":SystemUI-tests-utils",
         ":CarSystemUI-tests-multivalent",
-        ":CarSystemUIRobo-stub{.aapt.srcjar}",
     ],
     static_libs: [
         "CarSystemUI-core",
         "CarSystemUI-tests-base",
+        "CarSystemUIRobo-stub",
         "androidx.compose.ui_ui-test-junit4",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",
         "kosmos",
         "mockito-kotlin-nodeps",
+        "SystemUI_test_fixtures",
     ],
     libs: [
         "android.car",

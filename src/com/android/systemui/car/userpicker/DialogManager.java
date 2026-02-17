@@ -16,8 +16,6 @@
 
 package com.android.systemui.car.userpicker;
 
-import static com.android.systemui.car.userpicker.UserEventManager.getMaxSupportedUsers;
-
 import android.annotation.IntDef;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -37,7 +35,7 @@ import android.widget.TextView;
 
 import androidx.annotation.VisibleForTesting;
 
-import com.android.systemui.R;
+import com.android.systemui.car.shared.R;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -195,16 +193,11 @@ final class DialogManager {
                 message = mUserAddingMessage;
                 break;
             case DIALOG_TYPE_MAX_USER_COUNT_REACHED:
-                if (android.multiuser.Flags.consistentMaxUsers()
-                        && android.multiuser.Flags.maxUsersInCarIsForSecondary()) {
-                    // Includes secondary users and - for non-HSUM devices - the full system user.
-                    int maxSupportedUsers = mContext.getSystemService(UserManager.class)
-                            .getCurrentAllowedNumberOfUsers(UserManager.USER_TYPE_FULL_SECONDARY)
-                            + (UserManager.isHeadlessSystemUserMode() ? 0 : 1);
-                    message = String.format(mMaxUserLimitReachedMessage, maxSupportedUsers);
-                } else {
-                    message = String.format(mMaxUserLimitReachedMessage, getMaxSupportedUsers());
-                }
+                // Includes secondary users and - for non-HSUM devices - the full system user.
+                int maxSupportedUsers = mContext.getSystemService(UserManager.class)
+                        .getCurrentAllowedNumberOfUsers(UserManager.USER_TYPE_FULL_SECONDARY)
+                        + (UserManager.isHeadlessSystemUserMode() ? 0 : 1);
+                message = String.format(mMaxUserLimitReachedMessage, maxSupportedUsers);
                 break;
             case DIALOG_TYPE_CONFIRM_ADD_USER:
                 message = mConfirmAddUserMessage;

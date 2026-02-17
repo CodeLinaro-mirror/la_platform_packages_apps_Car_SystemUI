@@ -25,6 +25,7 @@ import android.app.ActivityManager;
 import android.app.ActivityOptions;
 import android.app.ActivityTaskManager;
 import android.app.role.RoleManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
@@ -32,6 +33,7 @@ import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.RemoteException;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Display;
@@ -43,16 +45,18 @@ import android.widget.LinearLayout;
 import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
-import com.android.systemui.R;
 import com.android.systemui.car.flexibleui.CarSystemBarElement;
 import com.android.systemui.car.flexibleui.CarSystemBarElementFlags;
 import com.android.systemui.car.flexibleui.CarSystemBarElementResolver;
+import com.android.systemui.car.shared.R;
 import com.android.systemui.car.window.OverlayViewController;
 import com.android.systemui.car.wm.scalableui.EventDispatcher;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.AlphaOptimizedImageView;
 
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * CarSystemBarButton is an image button that allows for a bit more configuration at the
@@ -109,7 +113,7 @@ public class CarSystemBarButton extends LinearLayout implements
     private boolean mIsDefaultAppIconForRoleEnabled;
     private boolean mToggleSelectedState;
     private String[] mPanelNames;
-    private String[] mComponentNames;
+    private final List<ComponentName> mComponentNames = new ArrayList<>();
     /** App categories that are to be used with this widget */
     private String[] mButtonCategories;
     /** App packages that are allowed to be used with this widget */
@@ -266,10 +270,7 @@ public class CarSystemBarButton extends LinearLayout implements
     /**
      * @return The list of component names.
      */
-    public String[] getComponentName() {
-        if (mComponentNames == null) {
-            return new String[0];
-        }
+    public List<ComponentName> getComponentNames() {
         return mComponentNames;
     }
 
@@ -361,7 +362,13 @@ public class CarSystemBarButton extends LinearLayout implements
             mButtonCategories = categoryString.split(BUTTON_FILTER_DELIMITER);
         }
         if (componentNameString != null) {
-            mComponentNames = componentNameString.split(BUTTON_FILTER_DELIMITER);
+            String[] componentNameStrings = componentNameString.split(BUTTON_FILTER_DELIMITER);
+            for (String componentName : componentNameStrings) {
+                ComponentName name = ComponentName.unflattenFromString(componentName);
+                if (name != null && !mComponentNames.contains(name)) {
+                    mComponentNames.add(name);
+                }
+            }
         }
         if (panelNamesString != null) {
             mPanelNames = panelNamesString.split(BUTTON_FILTER_DELIMITER);
@@ -446,7 +453,7 @@ public class CarSystemBarButton extends LinearLayout implements
             intent.putExtra(EXTRA_DIALOG_CLOSE_REASON, DIALOG_CLOSE_REASON_CAR_SYSTEMBAR_BUTTON);
             mContext.sendBroadcastAsUser(intent, getCurrentUserHandle(mContext, mUserTracker));
 
-            if (getEvent() != null && mEventDispatcher != null) {
+            if (!TextUtils.isEmpty(getEvent()) && mEventDispatcher != null) {
                 mEventDispatcher.executeEvent(getEvent());
             }
 

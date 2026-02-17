@@ -31,11 +31,11 @@ import android.widget.LinearLayout;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
 
-import com.android.systemui.R;
 import com.android.systemui.car.hvac.HvacController;
 import com.android.systemui.car.hvac.HvacPropertySetter;
 import com.android.systemui.car.hvac.HvacUtils;
 import com.android.systemui.car.hvac.HvacView;
+import com.android.systemui.car.hvac.ui.R;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -200,7 +200,9 @@ public class FanDirectionButtons extends LinearLayout implements HvacView {
     }
 
     private void updateViewPerAvailability() {
-        setAlpha(shouldAllowControl() ? mOnAlpha : mOffAlpha);
+        mContext.getMainExecutor().execute(() -> {
+            setAlpha(shouldAllowControl() ? mOnAlpha : mOffAlpha);
+        });
     }
 
     private boolean shouldAllowControl() {

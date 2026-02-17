@@ -24,6 +24,7 @@ import android.hardware.SensorPrivacyManager;
 import android.window.DisplayAreaOrganizer;
 
 import com.android.car.datasubscription.DataSubscriptionMessageCreator;
+import com.android.car.ui.utils.CarUxRestrictionsUtil;
 import com.android.keyguard.KeyguardViewController;
 import com.android.keyguard.dagger.KeyguardDisplayModule;
 import com.android.systemui.accessibility.AccessibilityModule;
@@ -55,6 +56,7 @@ import com.android.systemui.dock.DockManager;
 import com.android.systemui.dock.DockManagerImpl;
 import com.android.systemui.doze.DozeHost;
 import com.android.systemui.dreams.suppression.dagger.NoOpActivityRecognitionModule;
+import com.android.systemui.inputmethod.ImeSwitcherMenuModule;
 import com.android.systemui.lowlight.dagger.NoopAmbientLightModeMonitorModule;
 import com.android.systemui.media.muteawait.MediaMuteAwaitConnectionCli;
 import com.android.systemui.media.nearby.NearbyMediaDevicesManager;
@@ -106,6 +108,7 @@ import javax.inject.Provider;
                 CarMultiUserUtilsModule.class,
                 CarPolicyModule.class,
                 CarVolumeModule.class,
+                ImeSwitcherMenuModule.class,
                 ExternalDisplayController.StartableModule.class,
                 GestureModule.class,
                 HeadsUpEmptyImplModule.class,
@@ -251,5 +254,11 @@ abstract class CarSystemUIModule {
     @SysUISingleton
     static FlagManager provideFlagManager(Context context) {
         return new FlagManager(context);
+    }
+
+    @Provides
+    @SysUISingleton
+    static CarUxRestrictionsUtil provideCarUxRestrictionsUtil(Context context) {
+        return CarUxRestrictionsUtil.getInstance(context);
     }
 }

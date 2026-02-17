@@ -16,6 +16,7 @@
 package com.android.systemui.car.wm.scalableui.panel.controller;
 
 import static com.android.car.scalableui.loader.xml.PanelTagXmlParser.DEFAULT_COMPONENT_TAG;
+import static com.android.car.scalableui.loader.xml.PanelTagXmlParser.DEFAULT_INTENT_TAG;
 import static com.android.car.scalableui.loader.xml.PanelTagXmlParser.PERSISTENT_ACTIVITY_TAG;
 import static com.android.car.scalableui.loader.xml.PanelTagXmlParser.PERSISTENT_PACKAGE_TAG;
 import static com.android.car.scalableui.loader.xml.PanelTagXmlParser.UPDATABLE_INTENT_FILTER_TAG;
@@ -51,6 +52,7 @@ import dagger.assisted.AssistedInject;
 import java.net.URISyntaxException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -80,6 +82,8 @@ public class BaseTaskPanelController implements TaskPanelController {
     private final PanelUtils mPanelUtils;
     @Nullable
     private ComponentName mDefaultComponent;
+    @Nullable
+    private Intent mDefaultIntent;
     @Nullable
     private Intent mUpdateFilter;
     @GuardedBy("mLock")
@@ -117,6 +121,7 @@ public class BaseTaskPanelController implements TaskPanelController {
     @CallSuper
     public void init() {
         mDefaultComponent = parseDefaultComponent(mPanelControllerMetadata);
+        mDefaultIntent = parseDefaultIntent(mPanelControllerMetadata);
         mUpdateFilter = parseUpdateFilter(mPanelControllerMetadata);
         if (mUpdateFilter != null) {
             registerApplicationInstallUninstallReceiver();
@@ -141,6 +146,12 @@ public class BaseTaskPanelController implements TaskPanelController {
                 metadata.getStringConfiguration(DEFAULT_COMPONENT_TAG);
         return defaultIntentString == null ? null : ComponentName.unflattenFromString(
                 defaultIntentString);
+    }
+
+    private Intent parseDefaultIntent(@NonNull PanelControllerMetadata metadata) {
+        String intentString = metadata.getStringConfiguration(
+                DEFAULT_INTENT_TAG);
+        return getIntentFromString(intentString);
     }
 
     private void registerApplicationInstallUninstallReceiver() {
@@ -214,7 +225,7 @@ public class BaseTaskPanelController implements TaskPanelController {
             return null;
         }
         try {
-            return Intent.parseUri(string, Intent.URI_ANDROID_APP_SCHEME);
+            return Intent.parseUri(string, Intent.URI_INTENT_SCHEME);
         } catch (URISyntaxException e) {
             Log.e(TAG, "Fail to parse intent string" + string + ", e=" + e);
             return null;
@@ -247,8 +258,13 @@ public class BaseTaskPanelController implements TaskPanelController {
 
     @Override
     public Intent getDefaultComponent() {
-        Intent intent = new Intent();
-        intent.setComponent(mDefaultComponent);
+        Intent intent = null;
+        if (mDefaultComponent != null) {
+            intent = new Intent();
+            intent.setComponent(mDefaultComponent);
+        } else if (mDefaultIntent != null) {
+            intent = new Intent(mDefaultIntent); // make a copy for safety
+        }
         logIfDebuggable("getDefaultComponent =  " + intent);
         return intent;
     }
@@ -273,8 +289,10 @@ public class BaseTaskPanelController implements TaskPanelController {
 
     @Override
     public String toString() {
-        String persistentActivities = mPersistentActivities.stream().map(
-                ComponentName::toString).collect(Collectors.joining("\n,"));
+        String persistentActivities = mPersistentActivities.stream()
+                .filter(Objects::nonNull)
+                .map(ComponentName::toString)
+                .collect(Collectors.joining("\n,"));
         return "PanelController{"
                 + "mPanelControllerMetadata=" + mPanelControllerMetadata
                 + "\n, mPersistentActivities=" + persistentActivities
