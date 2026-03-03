@@ -32,6 +32,8 @@ import com.android.systemui.car.flags.Flag
 import com.android.systemui.car.flags.FlagManager
 import com.android.systemui.car.flexibleui.CarSystemBarElementStateController
 import com.android.systemui.car.flexibleui.CarSystemBarElementStatusBarDisableController
+import com.android.systemui.car.notification.NotificationPanelViewController
+import com.android.systemui.car.window.OverlayViewController
 import com.android.systemui.graphics.ImageLoaderImpl
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -64,6 +66,9 @@ class PromotedNotificationChipViewControllerTest : CarSysuiTestCase() {
     @Mock
     private lateinit var carNotificationListener: CarNotificationListener
     @Mock
+    private lateinit var notificationPanelViewController: NotificationPanelViewController
+
+    @Mock
     private lateinit var icon: Icon
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -87,7 +92,8 @@ class PromotedNotificationChipViewControllerTest : CarSysuiTestCase() {
             testScope,
             imageLoader,
             carNotificationListener,
-            flagManager
+            flagManager,
+            notificationPanelViewController
         )
     }
 
@@ -158,5 +164,155 @@ class PromotedNotificationChipViewControllerTest : CarSysuiTestCase() {
         captor.value.onClick(view)
 
         verify(carNotificationListener).showHun("key")
+    }
+
+    @Test
+    fun onPanelExpanded_hidesChip() {
+        `when`(flagManager.isEnabled(Flag.PromotedNotifications)).thenReturn(true)
+        controller.onViewAttached()
+        Mockito.clearInvocations(view)
+
+        val model = PromotedNotificationModel(
+            key = "key",
+            isHeadsUp = false,
+            postTime = 1000L,
+            shortCriticalText = "Text",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(model)
+        testScope.testScheduler.advanceUntilIdle()
+        verify(view).animateIn()
+
+        // Simulate panel expansion
+        val captor = ArgumentCaptor.forClass(
+            OverlayViewController.OverlayViewStateListener::class.java
+        )
+        verify(notificationPanelViewController).registerViewStateListener(captor.capture())
+
+        captor.value.onVisibilityChanged(true)
+        testScope.testScheduler.advanceUntilIdle()
+
+        verify(view).animateOut()
+    }
+
+    @Test
+    fun onPanelCollapsed_withPromotedNotification_showsChip() {
+        `when`(flagManager.isEnabled(Flag.PromotedNotifications)).thenReturn(true)
+        controller.onViewAttached()
+        Mockito.clearInvocations(view)
+
+        val model = PromotedNotificationModel(
+            key = "key",
+            isHeadsUp = false,
+            postTime = 1000L,
+            shortCriticalText = "Text",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(model)
+        testScope.testScheduler.advanceUntilIdle()
+
+        // Start with panel expanded and visible notification (so chip is hidden)
+        val captor = ArgumentCaptor.forClass(
+            OverlayViewController.OverlayViewStateListener::class.java
+        )
+        verify(notificationPanelViewController).registerViewStateListener(captor.capture())
+
+        captor.value.onVisibilityChanged(true)
+        testScope.testScheduler.advanceUntilIdle()
+
+        verify(view).animateOut()
+
+        Mockito.clearInvocations(view)
+
+        // Now collapse panel
+        captor.value.onVisibilityChanged(false)
+        testScope.testScheduler.advanceUntilIdle()
+
+        verify(view).animateIn()
+    }
+
+    @Test
+    fun onPromotedNotificationAdded_isHeadsUp_doesNotShowChip() {
+        `when`(flagManager.isEnabled(Flag.PromotedNotifications)).thenReturn(true)
+        controller.onViewAttached()
+
+        val model = PromotedNotificationModel(
+            key = "key",
+            isHeadsUp = true,
+            postTime = 1000L,
+            shortCriticalText = "Text",
+            smallIcon = icon
+        )
+
+        repository.addPromotedNotification(model)
+        testScope.testScheduler.advanceUntilIdle()
+
+        verify(view, Mockito.never()).animateIn()
+    }
+
+    @Test
+    fun onPromotedNotification_hunDismissed_showsChip() {
+        `when`(flagManager.isEnabled(Flag.PromotedNotifications)).thenReturn(true)
+        controller.onViewAttached()
+
+        // Initial HUN
+        val hunModel = PromotedNotificationModel(
+            key = "key",
+            isHeadsUp = true,
+            postTime = 1000L,
+            shortCriticalText = "Text",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(hunModel)
+        testScope.testScheduler.advanceUntilIdle()
+        verify(view, Mockito.never()).animateIn()
+
+        // Simulate HUN dismissal (isHeadsUp becomes false)
+        val dismissedModel = PromotedNotificationModel(
+            key = "key",
+            isHeadsUp = false,
+            postTime = 1000L,
+            shortCriticalText = "Text",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(dismissedModel)
+        testScope.testScheduler.advanceUntilIdle()
+
+        verify(view).animateIn()
+    }
+
+    @Test
+    fun onNewHun_priorChipRemainsVisible() {
+        `when`(flagManager.isEnabled(Flag.PromotedNotifications)).thenReturn(true)
+        controller.onViewAttached()
+
+        // Initial Promoted Notification (shows chip)
+        val oldModel = PromotedNotificationModel(
+            key = "old",
+            isHeadsUp = false,
+            postTime = 1000L,
+            shortCriticalText = "Old",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(oldModel)
+        testScope.testScheduler.advanceUntilIdle()
+        verify(view).animateIn()
+        Mockito.clearInvocations(view)
+
+        // New HUN arrives
+        val newHunModel = PromotedNotificationModel(
+            key = "new",
+            isHeadsUp = true,
+            postTime = 2000L,
+            shortCriticalText = "New",
+            smallIcon = icon
+        )
+        repository.addPromotedNotification(newHunModel)
+        testScope.testScheduler.advanceUntilIdle()
+
+        // Should NOT animate out (stays visible with old model)
+        verify(view, Mockito.never()).animateOut()
+        // Should NOT animate in again (no change in displayed notification)
+        verify(view, Mockito.never()).animateIn()
     }
 }
