@@ -57,6 +57,7 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionBootInt
 import com.android.systemui.log.SessionTracker;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.process.ProcessWrapper;
+import com.android.systemui.scene.domain.interactor.SceneInteractor;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeController;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
@@ -81,6 +82,7 @@ import dagger.Lazy;
 import kotlinx.coroutines.CoroutineScope;
 
 import java.util.concurrent.Executor;
+import java.util.Optional;
 
 /**
  * Car customizations on top of {@link KeyguardViewMediator}. Please refer to that class for
@@ -150,7 +152,8 @@ public class CarKeyguardViewMediator extends KeyguardViewMediator {
             KeyguardTransitionBootInteractor transitionBootInteractor,
             Lazy<CommunalSceneInteractor> communalSceneInteractor,
             Lazy<CommunalSettingsInteractor> communalSettingsInteractor,
-            WindowManagerOcclusionManager wmOcclusionManager) {
+            WindowManagerOcclusionManager wmOcclusionManager,
+            Lazy<SceneInteractor> sceneInteractor) {
         super(context, uiEventLogger, sessionTracker,
                 userTracker, falsingCollector, lockPatternUtils, broadcastDispatcher,
                 statusBarKeyguardViewManagerLazy, dismissCallbackRegistry, keyguardUpdateMonitor,
@@ -179,7 +182,9 @@ public class CarKeyguardViewMediator extends KeyguardViewMediator {
                 transitionBootInteractor,
                 communalSceneInteractor,
                 communalSettingsInteractor,
-                wmOcclusionManager);
+                wmOcclusionManager,
+                /* uiLatencyStatsManager= */ Optional.empty(),
+                sceneInteractor);
         mContext = context;
         mTrustManager = trustManager;
         mUserTracker = userTracker;
