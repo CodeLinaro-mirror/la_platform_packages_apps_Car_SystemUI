@@ -137,7 +137,7 @@
             android:src="@drawable/car_ic_debug"
             android:contentDescription="@string/status_icon_debug_status"/>
     </com.android.systemui.car.systembar.panel.CarSystemBarPanelButtonView>
-    <com.android.systemui.car.systembar.CarSystemBarButton
+    <com.android.systemui.car.systembar.base.CarSystemBarButton
         android:id="@+id/aaos_studio"
         android:layout_width="@dimen/car_quick_controls_entry_points_button_width"
         android:layout_height="match_parent"
@@ -149,7 +149,7 @@
         systemui:highlightWhenSelected="true"
         systemui:intent="intent:#Intent;action=android.intent.action.MAIN;package=com.android.aaos.studio;component=com.android.aaos.studio/.TokenActivity;end"
         systemui:systemBarDisableFlags="home"
-        systemui:controller="com.android.systemui.car.systembar.AaosStudioButtonController">
+        systemui:controller="com.android.systemui.car.systembar.aaosstudio.AaosStudioButtonController">
         <ImageView
             android:id="@+id/aaos_studio_icon"
             android:layout_width="@dimen/car_quick_controls_icon_drawable_width"
@@ -158,5 +158,5 @@
             android:tint="@color/car_status_icon_color"
             android:duplicateParentState="true"
             android:src="@drawable/car_ic_palette" />
-    </com.android.systemui.car.systembar.CarSystemBarButton>
+    </com.android.systemui.car.systembar.base.CarSystemBarButton>
 </LinearLayout>

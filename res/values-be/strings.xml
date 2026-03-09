@@ -17,14 +17,8 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="hvac_min_text" msgid="866677328637088715">"Мін"</string>
-    <string name="hvac_max_text" msgid="7627950157128770380">"Макс"</string>
-    <string name="fan_speed_max" msgid="956683571700419211">"МАКСІМУМ"</string>
-    <string name="fan_speed_off" msgid="3860115181014880798">"ВЫКЛЮЧАНА"</string>
-    <string name="hvac_temperature_off" msgid="8370977023494579242">"ВЫКЛЮЧАНА"</string>
     <string name="voice_recognition_toast" msgid="7579725862117020349">"Распазнаванне голасу выконвае падключаная прылада Bluetooth"</string>
     <string name="car_add_user" msgid="6182764665687382136">"Дадаць профіль"</string>
-    <string name="end_session" msgid="2765206020435441421">"Завяршыць сеанс"</string>
     <string name="car_new_user" msgid="6766334721724989964">"Новы профіль"</string>
     <string name="user_add_profile_title" msgid="828371911076521952">"Дадаць новы профіль?"</string>
     <string name="user_add_user_message_setup" msgid="1639791240776969175">"Уладальнік уліковага запісу зможа наладзіць новы профіль пасля таго, як вы яго дадасце."</string>
@@ -33,7 +27,6 @@
     <string name="profile_limit_reached_message" msgid="1534369584753840606">"{count,plural, =1{Можна стварыць толькі адзін профіль.}one{Можна дадаць максімум # профіль.}few{Можна дадаць максімум # профілі.}many{Можна дадаць максімум # профіляў.}other{Можна дадаць максімум # профілю.}}"</string>
     <string name="car_loading_profile" msgid="458961191993686065">"Ідзе загрузка"</string>
     <string name="car_loading_profile_developer_message" msgid="737810794567935702">"Ідзе загрузка профілю карыстальніка (ад <xliff:g id="FROM_USER">%1$d</xliff:g> да <xliff:g id="TO_USER">%2$d</xliff:g>)"</string>
-    <string name="current_profile_subtitle" msgid="7149515449757434139">"Бягучы профіль"</string>
     <string name="privacy_chip_off_content" msgid="8406415098507955316">"<xliff:g id="SENSOR">%1$s</xliff:g>: выключана."</string>
     <string name="privacy_chip_use_sensor" msgid="7688230720803089653">"Выкарыстоўваць гэта: <xliff:g id="SENSOR">%1$s</xliff:g>"</string>
     <string name="privacy_chip_use_sensor_subtext" msgid="5655148288310815742">"Для праграм, якія маюць дазвол"</string>
@@ -70,9 +63,6 @@
     <string name="system_bar_user_name_text" msgid="5859605302481171746">"Імя карыстальніка ў тэкставым фармаце"</string>
     <string name="hvac_decrease_button_label" msgid="5628481079099995286">"Панізіць тэмпературу"</string>
     <string name="hvac_increase_button_label" msgid="2855688290787396792">"Павысіць тэмпературу"</string>
-    <string name="status_icon_signal_mobile" msgid="7264721079060179783">"Налады сігналу: выкарыстоўваецца мабільная перадача даных"</string>
-    <string name="status_icon_signal_wifi" msgid="1257569337648058522">"Налады сігналу: Wi-Fi уключаны"</string>
-    <string name="status_icon_signal_hotspot" msgid="1023039120452006880">"Налады сігналу: хот-спот уключаны"</string>
     <string name="status_icon_display_status" msgid="2970020923181359144">"Налады экрана"</string>
     <string name="status_icon_debug_status" msgid="2503944482699701492">"Налады адладкі"</string>
     <string name="status_icon_sound_status" msgid="4923149230650995670">"Налады гуку"</string>
@@ -131,5 +121,4 @@
     <string name="back_btn" msgid="7774349944465667391">"Назад"</string>
     <string name="fullscreen" msgid="7648956467442135844">"Поўнаэкранны рэжым"</string>
     <string name="display_density_button_description" msgid="5355175016830062352">"Памер элементаў"</string>
-    <string name="data_subscription_button_text" msgid="6595983827855035949">"Паглядзець тарыфныя планы"</string>
 </resources>

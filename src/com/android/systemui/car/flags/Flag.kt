@@ -157,6 +157,14 @@ enum class Flag(
     ),
 
     /**
+     * Checks if the DisplayCompatibilityV2 is enabled.
+     */
+    DisplayCompatV2(
+        "com.android.systemui.car.Flags.displayCompatV2",
+        R.bool.display_compat_v2
+    ),
+
+    /**
      * Checks if the Media Projection indicator feature is enabled.
      */
     ShowMediaProjectionIndicator(
@@ -178,6 +186,14 @@ enum class Flag(
     ScalableUiMinimizedControls(
         "com.android.systemui.car.Flags.scalableUiMinimizedControls",
         R.bool.scalable_ui_minimized_controls
+    ),
+
+    /**
+     * Checks if special handling of promoted notifications is enabled.
+     */
+    PromotedNotifications(
+        "com.android.systemui.car.Flags.promotedNotifications",
+        R.bool.promoted_notifications
     );
 
     // These properties are now calculated from the fullFlagIdentifier.
