@@ -84,6 +84,7 @@ import dagger.Lazy;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -487,6 +488,21 @@ public class CarSystemBarControllerImpl implements CarSystemBarController,
             mSystemBarViewControllerMap.get(name)
                     .setSystemBarTouchListeners(mBarTouchListenersMap.get(name));
         }
+    }
+
+    @Override
+    public boolean isDragOpenNotificationEnabledByName(@NonNull String name) {
+        return mSystemBarConfigs.isDragOpenNotificationEnabledByName(name);
+    }
+
+    @Override
+    public boolean isDragCloseNotificationEnabledByName(@NonNull String name) {
+        return mSystemBarConfigs.isDragCloseNotificationEnabledByName(name);
+    }
+
+    @Override
+    public List<String> getSystemBarNamesByZOrder() {
+        return mSystemBarConfigs.getSystemBarNamesByZOrder();
     }
 
     /**

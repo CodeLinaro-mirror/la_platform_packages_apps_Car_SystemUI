@@ -24,6 +24,7 @@ android_library {
         "src/**/*.java",
         "src/**/*.kt",
     ],
+    resource_dirs: ["res"],
     static_libs: [
         "CarSystemUI-Shared",
         "CarSystemUI-FlexibleUI",

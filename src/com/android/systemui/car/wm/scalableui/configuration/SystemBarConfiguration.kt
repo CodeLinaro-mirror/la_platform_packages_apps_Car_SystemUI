@@ -18,6 +18,8 @@ package com.android.systemui.car.wm.scalableui.configuration
 
 import android.os.Bundle
 import com.android.car.scalableui.loader.xml.parser.SystemBarParser.BAR_Z_ORDER_ATTRIBUTE
+import com.android.car.scalableui.loader.xml.parser.SystemBarParser.DRAG_CLOSE_NOTIFICATION_ATTRIBUTE
+import com.android.car.scalableui.loader.xml.parser.SystemBarParser.DRAG_OPEN_NOTIFICATION_ATTRIBUTE
 import com.android.car.scalableui.loader.xml.parser.SystemBarParser.HIDE_FOR_KEYBOARD_ATTRIBUTE
 import com.android.car.scalableui.loader.xml.parser.SystemBarParser.TYPE_ATTRIBUTE
 import com.android.car.scalableui.loader.xml.parser.SystemBarParser.TYPE_NAVIGATION
@@ -82,6 +84,18 @@ data class SystemBarConfiguration(
          * @return `true` if this system bar should be hidden when keyboard is visible.
          */
         get() = configuration.getBoolean(HIDE_FOR_KEYBOARD_ATTRIBUTE)
+
+    val isDragOpenNotificationEnabled: Boolean
+        /**
+         * @return `true` if this system bar should trigger opening the notification panel.
+         */
+        get() = configuration.getBoolean(DRAG_OPEN_NOTIFICATION_ATTRIBUTE)
+
+    val isDragCloseNotificationEnabled: Boolean
+        /**
+         * @return `true` if this system bar should trigger closing the notification panel.
+         */
+        get() = configuration.getBoolean(DRAG_CLOSE_NOTIFICATION_ATTRIBUTE)
 
     @AssistedFactory
     interface Factory {
