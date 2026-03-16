@@ -109,6 +109,14 @@ enum class Flag(
     ),
 
     /**
+     * Checks if the Scalable UI task auto restart feature is enabled.
+     */
+    ScalableUiTaskAutoRestart(
+        "com.android.car.scalableui.Flags.scalableUiTaskAutoRestart",
+        R.bool.scalable_ui_task_auto_restart
+    ),
+
+    /**
      * Checks if the Scalable UI actions feature is enabled.
      */
     ScalableUiActions(
@@ -124,6 +132,17 @@ enum class Flag(
         R.bool.enable_ext_panel_updates
     ),
 
+    /**
+     * Checks if the Scalable UI task focus feature is enabled.
+     */
+    ScalableUiTaskFocus(
+        "com.android.car.scalableui.Flags.scalableUiTaskFocus",
+        R.bool.scalable_ui_task_focus
+    ),
+
+    /**
+     * Checks if the Scalable UI task focus feature is enabled.
+     */
     ScalableUiHandleConfigurationChange(
         "com.android.car.scalableui.Flags.scalableUiHandleConfigurationChange",
         R.bool.scalable_ui_handle_configuration_change

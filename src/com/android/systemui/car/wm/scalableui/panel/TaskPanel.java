@@ -387,7 +387,8 @@ public final class TaskPanel extends SysUIPanel {
         boolean isVisible = panelState.getCurrentVariant() != null
                 ? panelState.getCurrentVariant().isVisible()
                 : isVisible();
-        return panelState.getRestart() != null && isVisible;
+        return mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart)
+                && panelState.getRestart() != null && isVisible;
     }
 
     @Override

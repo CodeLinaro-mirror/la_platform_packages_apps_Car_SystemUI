@@ -52,6 +52,7 @@ import com.android.systemui.car.wm.scalableui.panel.PanelUtils;
 import com.android.systemui.car.wm.scalableui.panel.TaskPanel;
 import com.android.wm.shell.automotive.AutoLayoutManager;
 import com.android.wm.shell.automotive.AutoTaskStackController;
+import com.android.wm.shell.automotive.AutoTaskStackState;
 import com.android.wm.shell.automotive.AutoTaskStackTransaction;
 import com.android.wm.shell.automotive.AutoTaskStackTransitionHandlerDelegate;
 import com.android.wm.shell.automotive.TaskStackStateChange;
@@ -59,6 +60,7 @@ import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.transition.Transitions;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.inject.Inject;
@@ -265,7 +267,7 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
 
     @Override
     public void onTransitionConsumed(@NonNull IBinder transition,
-            @NonNull List<TaskStackStateChange> changedTaskStacks, boolean aborted,
+            @NonNull Map<Integer, AutoTaskStackState> changedTaskStacks, boolean aborted,
             @Nullable SurfaceControl.Transaction finishTransaction) {
         if (DEBUG) {
             Log.d(TAG, "onTransitionConsumed=" + aborted + ", transition=" + transition
@@ -274,8 +276,6 @@ public class PanelAutoTaskStackTransitionHandlerDelegate implements
         Trace.beginSection(TAG + "#onTransitionConsumed");
         boolean stopped = mPanelTransitionCoordinator.stopRunningAnimation(transition);
         if (!stopped && aborted) {
-            mPanelTransitionCoordinator.reconcileAutoTaskStackState(transition, changedTaskStacks,
-                    /* transitionInfo= */ null);
             // If the transition was aborted and the animation was never run, this transition likely
             // had no shell-related changes. Run the animations now to apply non-shell changes.
             mPanelTransitionCoordinator.playPendingAnimations(transition);
