@@ -19,6 +19,7 @@ package com.android.systemui.car.systembar.notificationchip
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.android.car.notification.CarNotificationListener
 import com.android.car.notification.PromotedNotificationModel
 import com.android.car.notification.PromotedNotificationsRepository
 import com.android.systemui.car.flags.Flag
@@ -27,6 +28,7 @@ import com.android.systemui.car.flexibleui.CarSystemBarElementController
 import com.android.systemui.car.flexibleui.CarSystemBarElementStateController
 import com.android.systemui.car.flexibleui.CarSystemBarElementStatusBarDisableController
 import com.android.systemui.car.notification.NotificationPanelViewController
+import com.android.systemui.car.window.OverlayViewController
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.graphics.ImageLoader
 import dagger.assisted.Assisted
@@ -34,6 +36,8 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,8 +55,9 @@ constructor(
     private val context: Context,
     @Application private val scope: CoroutineScope,
     private val imageLoader: ImageLoader,
-    private val notificationPanelViewController: NotificationPanelViewController,
-    private val flagManager: FlagManager
+    private val carNotificationListener: CarNotificationListener,
+    private val flagManager: FlagManager,
+    private val notificationPanelViewController: NotificationPanelViewController
 ) : CarSystemBarElementController<PromotedNotificationChipView>(
     view,
     disableController,
@@ -62,6 +67,13 @@ constructor(
     private val mutex = Mutex()
     private var job: Job? = null
     private var currentPromotedNotification: PromotedNotificationModel? = null
+    private val isPanelExpanded = MutableStateFlow(false)
+
+    private val overlayViewStateListener = object : OverlayViewController.OverlayViewStateListener {
+        override fun onVisibilityChanged(isVisible: Boolean) {
+            isPanelExpanded.value = isVisible
+        }
+    }
 
     @AssistedFactory
     interface Factory :
@@ -81,16 +93,21 @@ constructor(
                     return@setOnClickListener
                 }
 
-                if (!notificationPanelViewController.isVisible) {
-                    notificationPanelViewController.toggle()
-                }
+                carNotificationListener.showHun(it.key)
             }
         }
 
+        notificationPanelViewController.registerViewStateListener(overlayViewStateListener)
+        isPanelExpanded.value = notificationPanelViewController.isPanelExpanded
+
         job?.cancel()
         job = scope.launch {
-            PromotedNotificationsRepository.getInstance().promotedNotifications.collect { it ->
-                maybeShowPromotedChip(it)
+            combine(
+                PromotedNotificationsRepository.getInstance().promotedNotifications,
+                isPanelExpanded,
+                ::Pair
+            ).collect { (promotedNotifications, isPanelExpanded) ->
+                maybeShowPromotedChip(promotedNotifications, isPanelExpanded)
             }
         }
     }
@@ -98,12 +115,19 @@ constructor(
     public override fun onViewDetached() {
         super.onViewDetached()
 
+        notificationPanelViewController.removePanelViewStateListener(overlayViewStateListener)
+
         job?.cancel()
         job = null
     }
 
+    // TODO (b/485656033): Hide the promoted chip when the NC shade is open and the
+    //  promoted notification exists inside
+    // TODO (b/486207496): Hide the promoted chip when the HUN is triggered
+    // TODO (b/486231805): Hide the promoted chip with the app under automation is opened
     private suspend fun maybeShowPromotedChip(
-            promotedNotifications: List<PromotedNotificationModel>
+        promotedNotifications: List<PromotedNotificationModel>,
+        isPanelExpanded: Boolean
     ) {
         val entry = getMostRecentPromotedNotification(promotedNotifications)
         mutex.withLock {
@@ -115,6 +139,16 @@ constructor(
                 mView.animateOut()
                 return
             }
+
+            if (isPanelExpanded) {
+                if (DEBUG) {
+                    Log.d(TAG, "Notification shade open, hiding chip")
+                }
+                currentPromotedNotification = null
+                mView.animateOut()
+                return
+            }
+
             currentPromotedNotification?.let {
                 if (it == entry) {
                     return
@@ -135,14 +169,17 @@ constructor(
                     mView.updateNotificationIcon(null)
                 }
             }
+
             mView.animateIn()
         }
     }
 
     private fun getMostRecentPromotedNotification(
-            promotedNotifications: List<PromotedNotificationModel>
+        promotedNotifications: List<PromotedNotificationModel>
     ): PromotedNotificationModel? {
-        return promotedNotifications.maxByOrNull { it.postTime }
+        return promotedNotifications
+            .filter { !it.isHeadsUp }
+            .maxByOrNull { it.postTime }
     }
 
     private companion object {
