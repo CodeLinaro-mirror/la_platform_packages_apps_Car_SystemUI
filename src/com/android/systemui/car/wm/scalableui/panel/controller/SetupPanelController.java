@@ -77,22 +77,7 @@ public class SetupPanelController extends BaseTaskPanelController {
                     if (state == null || state.getCurrentVariant() == null) {
                         return;
                     }
-                    boolean isVisible = state.getCurrentVariant().isVisible();
-
-                    // Validate if the panel state has already changed due to conflict
-                    PanelState currState = StateManager.getPanelState(getPanelId());
-                    if (currState != null && currState.getCurrentVariant() != null) {
-                        boolean isCurrVisible = currState.getCurrentVariant().isVisible();
-                        if (isCurrVisible != isVisible) {
-                            Log.e(TAG, "Current visibility is not the same as callback - "
-                                    + "ignoring change for future callback"
-                                    + " callbackVisibility=" + isVisible
-                                    + " currentVisibility=" + isCurrVisible);
-                            return;
-                        }
-                    }
-
-                    onPanelVisibilityChanged(isVisible);
+                    onPanelVisibilityChanged(state.getCurrentVariant().isVisible());
                 }
             };
 
@@ -120,7 +105,7 @@ public class SetupPanelController extends BaseTaskPanelController {
             return;
         }
         if (!TextUtils.isEmpty(getPanelId())) {
-            PanelState state = StateManager.getPanelState(getPanelId());
+            PanelState state = StateManager.getInstance().getPanelState(getPanelId());
             if (state == null) {
                 return;
             }

@@ -33,7 +33,6 @@ import com.android.systemui.dagger.qualifiers.Default;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.privacy.PrivacyType;
-import com.android.systemui.shade.domain.interactor.ShadeInteractor;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.events.PrivacyDotViewController;
 import com.android.systemui.statusbar.events.PrivacyDotViewControllerImpl;
@@ -72,13 +71,11 @@ public class CarPrivacyChipViewController extends PrivacyDotViewControllerImpl
             @NotNull ConfigurationController configurationController,
             @NotNull StatusBarContentInsetsProvider contentInsetsProvider,
             @NotNull @Default SystemStatusAnimationScheduler animationScheduler,
-            @NotNull ShadeInteractor shadeInteractor,
             @NotNull @ScreenDecorationsThread DelayableExecutor uiExecutor,
             CommandQueue commandQueue,
             @CarPrivacyChipBarType int barType) {
         super(mainExecutor, scope, stateController, configurationController, contentInsetsProvider,
-                animationScheduler, shadeInteractor, null, uiExecutor, context.getDisplayId(),
-                null);
+                animationScheduler, null, null, uiExecutor, context.getDisplayId(), null);
         commandQueue.addCallback(this);
         mAnimationHelper = new CarPrivacyChipAnimationHelper(context);
         mBarType = barType;

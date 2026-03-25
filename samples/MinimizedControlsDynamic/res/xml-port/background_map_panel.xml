@@ -19,7 +19,6 @@
 
     <Variant id="@+id/base">
         <Layer layer="@integer/map_panel_layer"/>
-        <Focus onTransition="false" />
     </Variant>
 
     <Variant id="@+id/opened" parent="@id/base">

@@ -62,7 +62,6 @@ import com.android.systemui.keyguard.ui.viewmodel.GlanceableHubToPrimaryBouncerT
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToDreamingTransitionViewModel;
 import com.android.systemui.keyguard.ui.viewmodel.PrimaryBouncerToGoneTransitionViewModel;
 import com.android.systemui.log.BouncerLogger;
-import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor;
@@ -577,10 +576,8 @@ public class CarKeyguardViewController extends OverlayViewController implements
     }
 
     private void notifyKeyguardUpdateMonitor() {
-        if (!SceneContainerFlag.isEnabled()) {
-            mKeyguardUpdateMonitor.sendPrimaryBouncerChanged(
-                    primaryBouncerIsOrWillBeShowing(), isBouncerShowing());
-        }
+        mKeyguardUpdateMonitor.sendPrimaryBouncerChanged(
+                primaryBouncerIsOrWillBeShowing(), isBouncerShowing());
     }
 
     /**
@@ -596,9 +593,7 @@ public class CarKeyguardViewController extends OverlayViewController implements
         mMainExecutor.execute(() -> {
             hideInternal();
             mPrimaryBouncerInteractor.hide();
-            if (!SceneContainerFlag.isEnabled()) {
-                mPrimaryBouncerInteractor.show(/* isScrimmed= */ true, TAG + "#resetBouncer");
-            }
+            mPrimaryBouncerInteractor.show(/* isScrimmed= */ true, TAG + "#resetBouncer");
             revealKeyguardIfBouncerPrepared();
         });
     }

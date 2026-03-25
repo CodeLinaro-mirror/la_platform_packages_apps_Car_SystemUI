@@ -36,13 +36,6 @@ abstract class MinimizedControlsPanelModule {
         factory: MinimizedMediaControlsPanelController.Factory
     ): DecorPanelController.Factory<*>
 
-    @Binds
-    @IntoMap
-    @ClassKey(MinimizedDialerControlsPanelController::class)
-    abstract fun bindMinimizedDialerControlsControllerFactory(
-        factory: MinimizedDialerControlsPanelController.Factory
-    ): DecorPanelController.Factory<*>
-
     companion object {
         @Provides
         @IntoMap
@@ -50,14 +43,6 @@ abstract class MinimizedControlsPanelModule {
         @DecorPanelViewMap
         fun provideMinimizedMediaControlsView(context: Context): View {
             return MinimizedMediaControlsView(context)
-        }
-
-        @Provides
-        @IntoMap
-        @ClassKey(MinimizedDialerControlsView::class)
-        @DecorPanelViewMap
-        fun provideMinimizedDialerControlsView(context: Context): View {
-            return MinimizedDialerControlsView(context)
         }
     }
 }
