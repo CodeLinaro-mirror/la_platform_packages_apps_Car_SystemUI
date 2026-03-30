@@ -16,9 +16,6 @@
 
 package com.android.systemui.car.notification;
 
-import static com.android.systemui.car.notification.NotificationConstants.DRAG_OPEN_NOTIFICATION_BAR_NAMES;
-import static com.android.systemui.car.notification.NotificationConstants.DRAG_CLOSE_NOTIFICATION_BAR_NAMES;
-
 import android.car.hardware.power.CarPowerManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -37,10 +34,7 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 
-import java.util.List;
-
 import javax.inject.Inject;
-import javax.inject.Named;
 
 /**
  * The view mediator which attaches the view controller to other elements of the system ui. Disables
@@ -60,8 +54,6 @@ public class NotificationPanelViewMediator implements OverlayViewMediator,
     private final BroadcastDispatcher mBroadcastDispatcher;
     private final UserTracker mUserTracker;
     private final ConfigurationController mConfigurationController;
-    private final List<String> mDragOpenBarNames;
-    private final List<String> mDragCloseBarNames;
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
@@ -99,9 +91,7 @@ public class NotificationPanelViewMediator implements OverlayViewMediator,
             PowerManagerHelper powerManagerHelper,
             BroadcastDispatcher broadcastDispatcher,
             UserTracker userTracker,
-            ConfigurationController configurationController,
-            @Named(DRAG_OPEN_NOTIFICATION_BAR_NAMES) List<String> dragOpenBarNames,
-            @Named(DRAG_CLOSE_NOTIFICATION_BAR_NAMES) List<String> dragCloseBarNames) {
+            ConfigurationController configurationController) {
         mContext = context;
         mCarSystemBarController = carSystemBarController;
         mNotificationPanelViewController = notificationPanelViewController;
@@ -109,19 +99,28 @@ public class NotificationPanelViewMediator implements OverlayViewMediator,
         mBroadcastDispatcher = broadcastDispatcher;
         mUserTracker = userTracker;
         mConfigurationController = configurationController;
-        mDragOpenBarNames = dragOpenBarNames;
-        mDragCloseBarNames = dragCloseBarNames;
     }
 
     @Override
     @CallSuper
     public void registerListeners() {
-        mDragOpenBarNames.forEach(systemBarName ->
+        mCarSystemBarController.getSystemBarNamesByZOrder().forEach(systemBarName -> {
+            boolean isOpenEnabled = mCarSystemBarController
+                    .isDragOpenNotificationEnabledByName(systemBarName);
+
+            if (isOpenEnabled) {
                 mCarSystemBarController.registerBarTouchListener(systemBarName,
-                        mNotificationPanelViewController.getDragOpenTouchListener()));
-        mDragCloseBarNames.forEach(systemBarName ->
+                        mNotificationPanelViewController.getDragOpenTouchListener());
+            }
+
+            boolean isCloseEnabled = mCarSystemBarController
+                    .isDragCloseNotificationEnabledByName(systemBarName);
+
+            if (isCloseEnabled) {
                 mCarSystemBarController.registerBarTouchListener(systemBarName,
-                        mNotificationPanelViewController.getDragCloseTouchListener()));
+                        mNotificationPanelViewController.getDragCloseTouchListener());
+            }
+        });
 
         mBroadcastDispatcher.registerReceiver(mBroadcastReceiver,
                 new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), null,
