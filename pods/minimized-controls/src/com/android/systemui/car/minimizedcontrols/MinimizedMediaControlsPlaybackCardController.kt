@@ -18,6 +18,7 @@ package com.android.systemui.car.minimizedcontrols
 
 import android.app.ActivityOptions
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.view.View
@@ -46,14 +47,27 @@ class MinimizedMediaControlsPlaybackCardController(
 
     public override fun setupController() {
         super.setupController()
-        val albumArtContainer = mView.findViewById<View>(R.id.minimized_control_album_art_container)
-        albumArtContainer?.setOnClickListener {
+
+        val clickListener = View.OnClickListener {
             mDataModel.mediaSource.value?.let { mediaSource ->
                 try {
                     mediaSource.launchActivity(mContext, ActivityOptions.makeBasic())
                 } catch (e: Exception) {
                     Log.e(TAG, "Error launching media app", e)
                 }
+            }
+        }
+
+        shellExecutor.execute {
+            val isPortrait = mContext.resources.configuration.orientation ==
+                    Configuration.ORIENTATION_PORTRAIT
+            if (isPortrait) {
+                mView.findViewById<View>(R.id.card_container)
+                    ?.setOnClickListener(clickListener)
+            } else {
+                mView.findViewById<View>(
+                    R.id.minimized_control_album_art_container
+                )?.setOnClickListener(clickListener)
             }
         }
     }
@@ -85,6 +99,21 @@ class MinimizedMediaControlsPlaybackCardController(
     override fun updatePlaybackState(playbackState: PlaybackViewModel.PlaybackStateWrapper?) {
         shellExecutor.execute {
             super.updatePlaybackState(playbackState)
+            if (playbackState != null) {
+                // The background for these actions can be overridden by the super class when the
+                // playback state is active. We need to reset it to the correct drawable.
+                mView.findViewById<View>(R.id.playback_action_id1)?.setBackgroundResource(
+                    R.drawable.minimized_media_controls_action_item_background
+                )
+                mView.findViewById<View>(R.id.playback_action_id2)?.setBackgroundResource(
+                    R.drawable.minimized_media_controls_action_item_background
+                )
+                mView.findViewById<View>(R.id.play_pause_button)?.isEnabled = true
+            } else {
+                mView.findViewById<View>(R.id.playback_action_id1)?.setBackgroundResource(0)
+                mView.findViewById<View>(R.id.playback_action_id2)?.setBackgroundResource(0)
+                mView.findViewById<View>(R.id.play_pause_button)?.isEnabled = false
+            }
         }
     }
 

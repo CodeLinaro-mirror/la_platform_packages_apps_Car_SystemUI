@@ -27,7 +27,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:panelLayoutRes="@layout/qc_bluetooth_panel"
         systemui:disabledWhileUnprovisioned="true"
         systemui:systemBarDisable2Flags="quickSettings">
@@ -47,7 +47,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:panelLayoutRes="@layout/qc_connectivity_panel"
         systemui:disabledWhileUnprovisioned="true"
         systemui:systemBarDisable2Flags="quickSettings">
@@ -81,7 +81,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:panelLayoutRes="@layout/qc_display_panel"
         systemui:disabledWhileUnprovisioned="true"
         systemui:systemBarDisable2Flags="quickSettings">
@@ -103,7 +103,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:panelLayoutRes="@layout/qc_volume_panel"
         systemui:disabledWhileUnprovisioned="true"
         systemui:systemBarDisable2Flags="quickSettings">
@@ -123,7 +123,7 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:controller="com.android.systemui.car.systembar.debugpanel.DebugPanelViewController"
         systemui:disabledWhileUnprovisioned="true"
         systemui:systemBarDisable2Flags="quickSettings">
@@ -137,14 +137,14 @@
             android:src="@drawable/car_ic_debug"
             android:contentDescription="@string/status_icon_debug_status"/>
     </com.android.systemui.car.systembar.panel.CarSystemBarPanelButtonView>
-    <com.android.systemui.car.systembar.CarSystemBarButton
+    <com.android.systemui.car.systembar.base.CarSystemBarButton
         android:id="@+id/aaos_studio"
         android:layout_width="@dimen/car_quick_controls_entry_points_button_width"
         android:layout_height="match_parent"
         android:orientation="horizontal"
         android:gravity="center"
         android:layout_alignParentStart="true"
-        style="@style/TopBarButton"
+        style="@style/HorizontalBarButton"
         systemui:componentNames="@string/config_aaosStudioComponentName"
         systemui:highlightWhenSelected="true"
         systemui:intent="intent:#Intent;action=android.intent.action.MAIN;package=com.android.aaos.studio;component=com.android.aaos.studio/.TokenActivity;end"
@@ -158,5 +158,5 @@
             android:tint="@color/car_status_icon_color"
             android:duplicateParentState="true"
             android:src="@drawable/car_ic_palette" />
-    </com.android.systemui.car.systembar.CarSystemBarButton>
+    </com.android.systemui.car.systembar.base.CarSystemBarButton>
 </LinearLayout>

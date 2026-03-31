@@ -48,7 +48,7 @@ import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.car.CarDeviceProvisionedController;
 import com.android.systemui.car.flexibleui.CarSystemBarElementController;
 import com.android.systemui.car.qc.base.SystemUIQCViewController;
-import com.android.systemui.car.systembar.element.CarSystemBarElementInitializer;
+import com.android.systemui.car.systembar.base.element.CarSystemBarElementInitializer;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.util.ViewController;
@@ -357,6 +357,10 @@ public class PanelViewController extends ViewController<View> {
 
         WindowManager.LayoutParams lp = (WindowManager.LayoutParams) container.getLayoutParams();
         lp.flags |= WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+        if (mPanelContentProvider.getShowAsDropDown()) {
+            // We don't need to account for insets in showAsDropDown since we use offsets
+            lp.setFitInsetsTypes(0);
+        }
         lp.dimAmount = mDimValue;
         wm.updateViewLayout(container, lp);
     }
