@@ -16,9 +16,6 @@
 
 package com.android.systemui.car.notification;
 
-import static com.android.systemui.car.notification.NotificationConstants.DRAG_OPEN_NOTIFICATION_BAR_NAMES;
-import static com.android.systemui.car.notification.NotificationConstants.DRAG_CLOSE_NOTIFICATION_BAR_NAMES;
-
 import android.content.Context;
 
 import com.android.systemui.broadcast.BroadcastDispatcher;
@@ -28,10 +25,7 @@ import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 
-import java.util.List;
-
 import javax.inject.Inject;
-import javax.inject.Named;
 
 /**
  * Implementation of NotificationPanelViewMediator that sets the notification panel to be opened
@@ -48,18 +42,14 @@ public class TopNotificationPanelViewMediator extends NotificationPanelViewMedia
             PowerManagerHelper powerManagerHelper,
             BroadcastDispatcher broadcastDispatcher,
             UserTracker userTracker,
-            ConfigurationController configurationController,
-            @Named(DRAG_OPEN_NOTIFICATION_BAR_NAMES) List<String> dragOpenBarNames,
-            @Named(DRAG_CLOSE_NOTIFICATION_BAR_NAMES) List<String> dragCloseBarNames) {
+            ConfigurationController configurationController) {
         super(context,
                 carSystemBarController,
                 notificationPanelViewController,
                 powerManagerHelper,
                 broadcastDispatcher,
                 userTracker,
-                configurationController,
-                dragOpenBarNames,
-                dragCloseBarNames);
+                configurationController);
         notificationPanelViewController.setOverlayDirection(
                 OverlayPanelViewController.OVERLAY_FROM_TOP_BAR);
     }

@@ -148,6 +148,29 @@ public class CarHeadsUpNotificationSystemContainerTest extends CarSysuiTestCase 
     }
 
     @Test
+    public void inflateLayout_hunWindowPresentButLayoutParamsNull_fallsBackToSuper() {
+        // Arrange: HunWindow is present but its LayoutParams are null.
+        when(mHunWindow.getLayoutParams()).thenReturn(null);
+        // Spy on context and resources to control the fallback behavior from the superclass.
+        Context spiedContext = spy(mContext);
+        Resources spiedResources = spy(spiedContext.getResources());
+        when(spiedContext.getResources()).thenReturn(spiedResources);
+        // Set the config value that the superclass will read upon fallback.
+        when(spiedResources.getBoolean(R.bool.config_showHeadsUpNotificationOnBottom))
+                .thenReturn(true);
+
+        // Act: The constructor calls inflateLayout.
+        mCarHeadsUpNotificationSystemContainer = new CarHeadsUpNotificationSystemContainer(
+                spiedContext,
+                mCarDeviceProvisionedController, mOverlayViewGlobalStateController,
+                mSystemUiWindowProvider);
+
+        // Assert: Verify that the container fell back to the superclass implementation,
+        // which uses the config resource to determine its position.
+        assertThat(mCarHeadsUpNotificationSystemContainer.shouldShowHunOnBottom()).isTrue();
+    }
+
+    @Test
     public void inflateLayout_hunWindowNotPresent_showOnBottomIsTrue() {
         when(mSystemUiWindowProvider.getHunWindow()).thenReturn(Optional.empty());
         Context spiedContext = spy(mContext);
