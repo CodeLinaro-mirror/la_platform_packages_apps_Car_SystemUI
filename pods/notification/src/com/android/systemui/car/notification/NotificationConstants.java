@@ -18,15 +18,6 @@ package com.android.systemui.car.notification;
 
 /** Constants related to Notifications. */
 public class NotificationConstants {
-    /**
-     * Qualifier name for the list of system bar names that can drag open notifications.
-     */
-    public static final String DRAG_OPEN_NOTIFICATION_BAR_NAMES = "DragOpenNotificationBarNames";
-
-    /**
-     * Dagger {@link Named} for a list of strings that listen to notification drag close listener.
-     */
-    public static final String DRAG_CLOSE_NOTIFICATION_BAR_NAMES = "DragCloseNotificationBarNames";
 
     /** Overlay type key for the Notification panel. */
     public static final String OVERLAY_TYPE_NOTIFICATION_PANEL = "notification_panel";

@@ -27,10 +27,10 @@ import java.lang.annotation.RetentionPolicy;
 public final class SystemBarConstants {
     private SystemBarConstants() {}
 
-    public static final String TOP_BAR_NAME = "Top";
-    public static final String BOTTOM_BAR_NAME = "Bottom";
-    public static final String LEFT_BAR_NAME = "Left";
-    public static final String RIGHT_BAR_NAME = "Right";
+    public static final String TOP_BAR_NAME = "TopCarSystemBar";
+    public static final String BOTTOM_BAR_NAME = "BottomCarSystemBar";
+    public static final String LEFT_BAR_NAME = "LeftCarSystemBar";
+    public static final String RIGHT_BAR_NAME = "RightCarSystemBar";
 
     public static final int STATUS_BAR = 0;
     public static final int NAVIGATION_BAR = 1;

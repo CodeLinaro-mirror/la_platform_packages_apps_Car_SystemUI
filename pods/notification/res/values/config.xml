@@ -52,22 +52,4 @@
         config_initialNotificationBackgroundAlpha, the background will default
         to a constant alpha percent value using the initial alpha. -->
     <integer name="config_finalNotificationBackgroundAlpha">100</integer>
-
-    <!--
-        List of system bar names that should register NotificationPanelViewController's
-        DragOpenTouchListener
-    -->
-    <string-array name="config_notificationDragOpenListener" translatable="false">
-        <item>TopCarSystemBar</item>
-    </string-array>
-
-    <!--
-        List of system bar names that should register NotificationPanelViewController's
-        DragCloseTouchListener
-    -->
-    <string-array name="config_notificationDragCloseListener" translatable="false">
-        <item>BottomCarSystemBar</item>
-        <item>LeftCarSystemBar</item>
-        <item>RightCarSystemBar</item>
-    </string-array>
 </resources>
