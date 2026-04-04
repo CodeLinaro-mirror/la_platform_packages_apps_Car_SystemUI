@@ -214,16 +214,6 @@ public class SystemBarWindowImpl extends SystemUiWindowBase implements SystemBar
         return mConfiguration.isHiddenForKeyboard();
     }
 
-    @Override
-    public boolean isDragOpenNotificationEnabled() {
-        return mConfiguration.isDragOpenNotificationEnabled();
-    }
-
-    @Override
-    public boolean isDragCloseNotificationEnabled() {
-        return mConfiguration.isDragCloseNotificationEnabled();
-    }
-
     /**
      * Calculates the index for the {@link InsetsFrameProvider} for
      * {@link WindowInsets.Type#mandatorySystemGestures}.

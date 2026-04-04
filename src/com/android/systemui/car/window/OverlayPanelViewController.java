@@ -141,10 +141,10 @@ public abstract class OverlayPanelViewController extends OverlayViewController {
                 });
 
         mDragOpenTouchListener = (v, event) -> {
-            boolean shouldAnimate = shouldAnimateExpandPanel();
-            boolean isUserSetup = mCarDeviceProvisionedController.isCurrentUserFullySetup();
-
-            if (!shouldAnimate || !isUserSetup) {
+            if (!shouldAnimateExpandPanel()) {
+                return true;
+            }
+            if (!mCarDeviceProvisionedController.isCurrentUserFullySetup()) {
                 return true;
             }
             if (!isInflated()) {

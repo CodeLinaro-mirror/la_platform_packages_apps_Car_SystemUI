@@ -27,12 +27,6 @@ interface SystemBarWindow : SystemUiWindow {
 
     /** `true` if this system bar should be hidden when keyboard is visible. */
     val isHiddenForKeyboard: Boolean
-
-    /** `true` if this system bar should trigger opening the notification panel. */
-    val isDragOpenNotificationEnabled: Boolean
-
-    /** `true` if this system bar should trigger closing the notification panel. */
-    val isDragCloseNotificationEnabled: Boolean
 }
 
 /**

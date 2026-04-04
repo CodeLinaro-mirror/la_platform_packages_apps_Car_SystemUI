@@ -61,7 +61,6 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.settings.DisplayTracker;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -112,9 +111,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     private boolean mBottomNavBarEnabled;
     private boolean mLeftNavBarEnabled;
     private boolean mRightNavBarEnabled;
-
-    private List<String> mOpenBarNames;
-    private List<String> mCloseBarNames;
 
     @Inject
     public SystemBarConfigsImpl(Context context, @Main Resources resources,
@@ -265,24 +261,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     }
 
     @Override
-    public boolean isDragOpenNotificationEnabledByName(@NonNull String name) {
-        if (mOpenBarNames != null && mOpenBarNames.contains(name)) {
-            return true;
-        }
-        SystemBarWindow systemBarWindow = mSystemBars.get(name);
-        return systemBarWindow != null && systemBarWindow.isDragOpenNotificationEnabled();
-    }
-
-    @Override
-    public boolean isDragCloseNotificationEnabledByName(@NonNull String name) {
-        if (mCloseBarNames != null && mCloseBarNames.contains(name)) {
-            return true;
-        }
-        SystemBarWindow systemBarWindow = mSystemBars.get(name);
-        return systemBarWindow != null && systemBarWindow.isDragCloseNotificationEnabled();
-    }
-
-    @Override
     public void insetSystemBar(@NonNull String name, ViewGroup view) {
         if (mSystemBars.get(name) == null || !(mSystemBars.get(
                 name) instanceof InternalSystemBarWindow)) {
@@ -426,13 +404,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
     private void readConfigs() {
         mSystemBars.clear();
 
-        mOpenBarNames = Arrays.asList(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragOpenListener));
-        mCloseBarNames = Arrays.asList(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragCloseListener));
-
         if (!mWindowProvider.getSystemBarWindows().isEmpty()) {
             mWindowProvider.getSystemBarWindows().forEach(systemUiWindow -> {
                 SystemBarWindow systemBarWindow = (SystemBarWindow) systemUiWindow;
@@ -456,8 +427,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .setIndex(type == STATUS_BAR ? 0 : 1)
                     .setIndexOffset(type == STATUS_BAR  ? 1 : 0)
                     .setName(TOP_BAR_NAME)
-                    .setDragOpenNotificationEnabled(mOpenBarNames.contains(TOP_BAR_NAME))
-                    .setDragCloseNotificationEnabled(mCloseBarNames.contains(TOP_BAR_NAME))
                     .build();
             SystemBarWindow topBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_top_system_bar_height),
@@ -476,8 +445,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .setIndex(type == STATUS_BAR ? 0 : 1)
                     .setIndexOffset(type == STATUS_BAR  ? 1 : 0)
                     .setName(BOTTOM_BAR_NAME)
-                    .setDragOpenNotificationEnabled(mOpenBarNames.contains(BOTTOM_BAR_NAME))
-                    .setDragCloseNotificationEnabled(mCloseBarNames.contains(BOTTOM_BAR_NAME))
                     .build();
             SystemBarWindow bottomBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_bottom_system_bar_height),
@@ -496,8 +463,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .setIndex(type == STATUS_BAR ? 0 : 1)
                     .setIndexOffset(type == STATUS_BAR  ? 1 : 0)
                     .setName(LEFT_BAR_NAME)
-                    .setDragOpenNotificationEnabled(mOpenBarNames.contains(LEFT_BAR_NAME))
-                    .setDragCloseNotificationEnabled(mCloseBarNames.contains(LEFT_BAR_NAME))
                     .build();
             SystemBarWindow leftBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_left_system_bar_width),
@@ -516,8 +481,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
                     .setIndex(type == STATUS_BAR ? 0 : 1)
                     .setIndexOffset(type == STATUS_BAR  ? 1 : 0)
                     .setName(RIGHT_BAR_NAME)
-                    .setDragOpenNotificationEnabled(mOpenBarNames.contains(RIGHT_BAR_NAME))
-                    .setDragCloseNotificationEnabled(mCloseBarNames.contains(RIGHT_BAR_NAME))
                     .build();
             SystemBarWindow rightBarWindow = new InternalSystemBarWindow(mContext,
                     mResources.getDimensionPixelSize(R.dimen.car_right_system_bar_width),
@@ -663,8 +626,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         private int mIndexOffset;
         private String mName;
         private boolean mHideForKeyboard;
-        private boolean mDragOpenNotificationEnabled;
-        private boolean mDragCloseNotificationEnabled;
 
         private SystemBarConfigBuilder setBarType(int type) {
             mBarType = type;
@@ -696,26 +657,12 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
             return this;
         }
 
-        private SystemBarConfigBuilder setDragOpenNotificationEnabled(boolean enabled) {
-            mDragOpenNotificationEnabled = enabled;
-            return this;
-        }
-
-        private SystemBarConfigBuilder setDragCloseNotificationEnabled(boolean enabled) {
-            mDragCloseNotificationEnabled = enabled;
-            return this;
-        }
-
         private SystemBarConfiguration build() {
             Bundle bundle = new Bundle();
             bundle.putInt(SystemBarParser.BAR_Z_ORDER_ATTRIBUTE, mZOrder);
             bundle.putBoolean(SystemBarParser.HIDE_FOR_KEYBOARD_ATTRIBUTE, mHideForKeyboard);
             bundle.putString(SystemBarParser.TYPE_ATTRIBUTE,
                     mBarType == STATUS_BAR ? TYPE_STATUS : TYPE_NAVIGATION);
-            bundle.putBoolean(SystemBarParser.DRAG_OPEN_NOTIFICATION_ATTRIBUTE,
-                    mDragOpenNotificationEnabled);
-            bundle.putBoolean(SystemBarParser.DRAG_CLOSE_NOTIFICATION_ATTRIBUTE,
-                    mDragCloseNotificationEnabled);
             return new SystemBarConfiguration(bundle, mName, mIndex, mIndexOffset);
         }
     }
@@ -761,16 +708,6 @@ public class SystemBarConfigsImpl implements SystemBarConfigs {
         @Override
         public boolean isHiddenForKeyboard() {
             return mConfig.isHiddenForKeyboard();
-        }
-
-        @Override
-        public boolean isDragOpenNotificationEnabled() {
-            return mConfig.isDragOpenNotificationEnabled();
-        }
-
-        @Override
-        public boolean isDragCloseNotificationEnabled() {
-            return mConfig.isDragCloseNotificationEnabled();
         }
 
         @Override

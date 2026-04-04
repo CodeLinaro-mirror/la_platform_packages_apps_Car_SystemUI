@@ -77,16 +77,6 @@ public interface SystemBarConfigs {
     boolean getHideForKeyboardByName(@NonNull String name);
 
     /**
-     * @return {@code true} if the system bar should trigger opening the notification panel.
-     */
-    boolean isDragOpenNotificationEnabledByName(@NonNull String name);
-
-    /**
-     * @return {@code true} if the system bar should trigger closing the notification panel.
-     */
-    boolean isDragCloseNotificationEnabledByName(@NonNull String name);
-
-    /**
      * Applies padding to the given system bar view.
      *
      * @param view The system bar view

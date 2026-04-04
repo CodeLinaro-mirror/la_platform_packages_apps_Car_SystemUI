@@ -28,7 +28,6 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.List;
 
 /**
  * An interface for controlling system bars.
@@ -50,19 +49,4 @@ public interface CarSystemBarController extends ConfigurationController.Configur
      * Registers a touch listener callbar for the given system bar side.
      */
     void registerBarTouchListener(@NonNull String name, View.OnTouchListener listener);
-
-    /**
-     * @return {@code true} if the system bar should trigger opening the notification panel.
-     */
-    boolean isDragOpenNotificationEnabledByName(@NonNull String name);
-
-    /**
-     * @return {@code true} if the system bar should trigger closing the notification panel.
-     */
-    boolean isDragCloseNotificationEnabledByName(@NonNull String name);
-
-    /**
-     * @return A list of system bar names sorted by their Z order.
-     */
-    List<String> getSystemBarNamesByZOrder();
 }

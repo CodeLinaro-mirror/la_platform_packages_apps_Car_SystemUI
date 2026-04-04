@@ -182,7 +182,7 @@ public class CarSystemBarViewControllerImpl
                     : false;
 
             // Forward touch events to the status bar window so it can drag
-            // windows if required (ex. Notification shade).
+            // windows if required (ex. Notification shade)
             triggerAllTouchListeners(mView, ev);
 
             if (mConsumeTouchWhenPanelOpen && shouldConsumeEvent) {

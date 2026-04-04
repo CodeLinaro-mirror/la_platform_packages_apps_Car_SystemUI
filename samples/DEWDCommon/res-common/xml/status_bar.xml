@@ -13,7 +13,7 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
   -->
-<SystemBar id="status" defaultVariant="@id/open" barZOrder="1" type="status" hideForKeyboard="false" dragOpenNotification="true">
+<SystemBar id="status" defaultVariant="@id/open" barZOrder="1" type="status" hideForKeyboard="false">
     <Variant id="@+id/base">
         <Bounds width="100%" height="@*android:dimen/status_bar_height"  top="0" left="0"/>
     </Variant>

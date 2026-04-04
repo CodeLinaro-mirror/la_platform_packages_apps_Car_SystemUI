@@ -163,54 +163,6 @@ class SystemBarConfigurationTest : CarSysuiTestCase() {
         assertThat(systemBarConfiguration.isHiddenForKeyboard).isTrue()
     }
 
-    @Test
-    fun isDragOpenNotificationEnabled_isTrue() {
-        testBundle.putBoolean(SystemBarParser.DRAG_OPEN_NOTIFICATION_ATTRIBUTE, true)
-        val systemBarConfiguration = SystemBarConfiguration(
-            Optional.of(mockPanelUpdateConsumer),
-            NAME,
-            INDEX,
-            INDEX_OFFSET
-        )
-        assertThat(systemBarConfiguration.isDragOpenNotificationEnabled).isTrue()
-    }
-
-    @Test
-    fun isDragOpenNotificationEnabled_isFalse() {
-        testBundle.putBoolean(SystemBarParser.DRAG_OPEN_NOTIFICATION_ATTRIBUTE, false)
-        val systemBarConfiguration = SystemBarConfiguration(
-            Optional.of(mockPanelUpdateConsumer),
-            NAME,
-            INDEX,
-            INDEX_OFFSET
-        )
-        assertThat(systemBarConfiguration.isDragOpenNotificationEnabled).isFalse()
-    }
-
-    @Test
-    fun isDragCloseNotificationEnabled_isTrue() {
-        testBundle.putBoolean(SystemBarParser.DRAG_CLOSE_NOTIFICATION_ATTRIBUTE, true)
-        val systemBarConfiguration = SystemBarConfiguration(
-            Optional.of(mockPanelUpdateConsumer),
-            NAME,
-            INDEX,
-            INDEX_OFFSET
-        )
-        assertThat(systemBarConfiguration.isDragCloseNotificationEnabled).isTrue()
-    }
-
-    @Test
-    fun isDragCloseNotificationEnabled_isFalse() {
-        testBundle.putBoolean(SystemBarParser.DRAG_CLOSE_NOTIFICATION_ATTRIBUTE, false)
-        val systemBarConfiguration = SystemBarConfiguration(
-            Optional.of(mockPanelUpdateConsumer),
-            NAME,
-            INDEX,
-            INDEX_OFFSET
-        )
-        assertThat(systemBarConfiguration.isDragCloseNotificationEnabled).isFalse()
-    }
-
     companion object {
         private const val NAME = "test"
         private const val INDEX = 1

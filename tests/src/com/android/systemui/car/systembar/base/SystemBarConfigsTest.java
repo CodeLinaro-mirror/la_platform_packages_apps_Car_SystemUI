@@ -211,54 +211,6 @@ public class SystemBarConfigsTest extends CarSysuiTestCase {
     }
 
     @Test
-    public void isDragOpenNotificationEnabledByName_whenLegacyListContainsName_returnsTrue() {
-        when(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragOpenListener))
-                .thenReturn(new String[]{TOP_BAR_NAME});
-        mSystemBarConfigs =
-                new SystemBarConfigsImpl(mContext, mResources, mWindowProvider, mViewSupplierMap,
-                        mWindowSupplierMap, mDisplayTracker);
-        boolean isEnabled = mSystemBarConfigs.isDragOpenNotificationEnabledByName(TOP_BAR_NAME);
-
-        assertTrue(isEnabled);
-    }
-
-    @Test
-    public void isDragOpenNotificationEnabledByName_notInLegacyList_returnsFalse() {
-        mSystemBarConfigs =
-                new SystemBarConfigsImpl(mContext, mResources, mWindowProvider, mViewSupplierMap,
-                        mWindowSupplierMap, mDisplayTracker);
-        boolean isEnabled = mSystemBarConfigs.isDragOpenNotificationEnabledByName(TOP_BAR_NAME);
-
-        assertFalse(isEnabled);
-    }
-
-    @Test
-    public void isDragCloseNotificationEnabledByName_whenLegacyListContainsName_returnsTrue() {
-        when(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragCloseListener))
-                .thenReturn(new String[]{TOP_BAR_NAME});
-        mSystemBarConfigs =
-                new SystemBarConfigsImpl(mContext, mResources, mWindowProvider, mViewSupplierMap,
-                        mWindowSupplierMap, mDisplayTracker);
-        boolean isEnabled = mSystemBarConfigs.isDragCloseNotificationEnabledByName(TOP_BAR_NAME);
-
-        assertTrue(isEnabled);
-    }
-
-    @Test
-    public void isDragCloseNotificationEnabledByName_notInLegacyList_returnsFalse() {
-        mSystemBarConfigs =
-                new SystemBarConfigsImpl(mContext, mResources, mWindowProvider, mViewSupplierMap,
-                        mWindowSupplierMap, mDisplayTracker);
-        boolean isEnabled = mSystemBarConfigs.isDragCloseNotificationEnabledByName(TOP_BAR_NAME);
-
-        assertFalse(isEnabled);
-    }
-
-    @Test
     public void topSystemBarHasHigherZOrderThanHuns_topSystemBarIsSystemBarPanelType() {
         when(mResources.getInteger(R.integer.config_topSystemBarZOrder)).thenReturn(
                 SystemBarConfigsImpl.HUN_Z_ORDER + 1);
@@ -431,15 +383,6 @@ public class SystemBarConfigsTest extends CarSysuiTestCase {
                 false);
         when(mResources.getBoolean(R.bool.config_hideRightSystemBarForKeyboard)).thenReturn(
                 false);
-
-        when(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragOpenListener))
-                .thenReturn(new String[0]);
-        when(mResources.getStringArray(
-                com.android.systemui.car.systembar.base.R.array
-                        .config_notificationDragCloseListener))
-                .thenReturn(new String[0]);
     }
 
     // Intentionally using a subclass of TopNotificationPanelViewMediator for testing purposes to
@@ -456,7 +399,7 @@ public class SystemBarConfigsTest extends CarSysuiTestCase {
                 ConfigurationController configurationController) {
             super(context, carSystemBarController, notificationPanelViewController,
                     powerManagerHelper, broadcastDispatcher, userTracker,
-                    configurationController);
+                    configurationController, new ArrayList<>(), new ArrayList<>());
         }
     }
 }
