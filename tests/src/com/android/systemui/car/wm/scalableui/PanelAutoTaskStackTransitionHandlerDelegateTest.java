@@ -181,11 +181,11 @@ public class PanelAutoTaskStackTransitionHandlerDelegateTest extends CarSysuiTes
     public void testOnTransitionConsumed() {
         mDelegate.onTransitionConsumed(
                 mock(IBinder.class),
-                Collections.emptyMap(),
+                Collections.emptyList(),
                 false,
                 mock(SurfaceControl.Transaction.class));
 
-        verify(mPanelTransitionCoordinator).stopRunningAnimations(any());
+        verify(mPanelTransitionCoordinator).stopRunningAnimation(any());
     }
 
     @Test

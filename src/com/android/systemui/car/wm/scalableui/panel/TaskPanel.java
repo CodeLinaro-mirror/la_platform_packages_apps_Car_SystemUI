@@ -166,6 +166,10 @@ public final class TaskPanel extends SysUIPanel {
     @NonNull
     private Rect mRelativeToolbarBounds = new Rect();
 
+    /** Keeps track of the last known insets of the panel. */
+    @Nullable
+    private Rect[] mCurrentInsets;
+
     @AssistedInject
     public TaskPanel(AutoTaskStackController autoTaskStackController,
             @NonNull Context context,
@@ -381,8 +385,13 @@ public final class TaskPanel extends SysUIPanel {
      */
     public boolean hasRestart() {
         PanelState panelState = getPanelState();
-        return mFlagManager.isEnabled(Flag.ScalableUiTaskAutoRestart) && panelState != null
-                && panelState.getRestart() != null && isVisible();
+        if (panelState == null) {
+            return false;
+        }
+        boolean isVisible = panelState.getCurrentVariant() != null
+                ? panelState.getCurrentVariant().isVisible()
+                : isVisible();
+        return panelState.getRestart() != null && isVisible;
     }
 
     @Override
@@ -405,9 +414,10 @@ public final class TaskPanel extends SysUIPanel {
         }
         AutoTaskStackTransaction autoTaskStackTransaction = new AutoTaskStackTransaction();
         Variant currentVariant = mPanelUtils.getCurrentVariant(getPanelId());
+        boolean isVisible = currentVariant != null ? currentVariant.isVisible() : isVisible();
         AutoTaskStackState autoTaskStackState = new AutoTaskStackState(
                 currentVariant != null ? currentVariant.getBounds() : getBounds(),
-                currentVariant != null ? currentVariant.isVisible() : isVisible(),
+                isVisible,
                 currentVariant != null ? currentVariant.getLayer() : getLayer());
         autoTaskStackTransaction.setTaskStackState(getRootStack().getId(), autoTaskStackState);
         if (mFlagManager.isEnabled(Flag.DisplayCompatibilityAutoDecorSafeRegion)) {
@@ -417,7 +427,7 @@ public final class TaskPanel extends SysUIPanel {
             setupTaskToolbar(mRootTaskStack,
                     getRelativeBounds(getTaskToolbarBounds(), getBounds()));
         }
-        if (isVisible()) {
+        if (isVisible) {
             setBaseIntent(autoTaskStackTransaction);
         }
         getShellMainExecutor().execute(
@@ -724,10 +734,18 @@ public final class TaskPanel extends SysUIPanel {
         Rect bounds = variant == null ? getBounds() : variant.getBounds();
 
         Rect[] insetSides = new Rect[4];
-        insetSides[0] = new Rect(0, 0, insets.left, bounds.bottom);
-        insetSides[1] = new Rect(0, 0, bounds.right, insets.top);
-        insetSides[2] = new Rect(bounds.right - insets.right, 0, bounds.right, bounds.bottom);
-        insetSides[3] = new Rect(0, bounds.bottom - insets.bottom, bounds.right, bounds.bottom);
+        insetSides[0] = insets.left != 0
+            ? new Rect(bounds.left, bounds.top, bounds.left + insets.left, bounds.bottom)
+            : null;
+        insetSides[1] = insets.top != 0
+            ? new Rect(bounds.left, bounds.top, bounds.right, bounds.top + insets.top)
+            : null;
+        insetSides[2] = insets.right != 0
+            ? new Rect(bounds.right - insets.right, bounds.top, bounds.right, bounds.bottom)
+            : null;
+        insetSides[3] = insets.bottom != 0
+            ? new Rect(bounds.left, bounds.bottom - insets.bottom, bounds.right, bounds.bottom)
+            : null;
         return insetSides;
     }
 
@@ -796,21 +814,10 @@ public final class TaskPanel extends SysUIPanel {
         } else {
             Log.e(TAG, "leash is " + getLeash() + ", tx is " + tx);
         }
-        // TODO b/466431797: Revisit the threading mode for car-wm-shell + ScalableUI
-        // Execute AutoLayoutManager transactions on ShellBgThread, we may not block the
-        // SysUI/WM MainThread as it's not part of the same surface transaction.
-        getShellBgExecutor().execute(() -> {
-            RootTaskStack rootTaskStack = getRootStack();
-            if (rootTaskStack == null) {
-                Log.w(TAG, "Skip updating insets, RootTaskStack is null for " + getPanelId());
-                return;
-            }
-            Rect[] panelInsets = getInsetRects(variant);
-            IntStream.range(0, panelInsets.length).forEach(sideIndex -> {
-                mAutoLayoutManager.addOrUpdateInsets(rootTaskStack, sideIndex,
-                        systemOverlays(), panelInsets[sideIndex]);
-            });
-        });
+
+        Rect[] panelInsets = getInsetRects(variant);
+        addOrUpdateInsets(panelInsets);
+
         if (updateChildren) {
             // autoSurfaceTransaction being null should not be possible if the caller is properly
             // using the update methods rather than directly calling internal method.
@@ -824,6 +831,30 @@ public final class TaskPanel extends SysUIPanel {
 
         }
         Trace.endSection();
+    }
+
+    private void addOrUpdateInsets(Rect[] panelInsets) {
+        if (Arrays.equals(mCurrentInsets, panelInsets)) {
+            return;
+        }
+        mCurrentInsets = panelInsets;
+
+        // TODO b/466431797: Revisit the threading mode for car-wm-shell + ScalableUI
+        // Execute AutoLayoutManager transactions on ShellBgThread, we may not block the
+        // SysUI/WM MainThread as it's not part of the same surface transaction.
+        getShellBgExecutor().execute(() -> {
+            RootTaskStack rootTaskStack = getRootStack();
+            if (rootTaskStack == null) {
+                Log.w(TAG, "Skip updating insets, RootTaskStack is null for " + getPanelId());
+                return;
+            }
+
+            IntStream.range(0, panelInsets.length).forEach(index -> {
+                Rect insets = panelInsets[index] == null ? new Rect() : panelInsets[index];
+                mAutoLayoutManager.addOrUpdateInsets(rootTaskStack, index,
+                        systemOverlays(), insets);
+            });
+        });
     }
 
     @Override

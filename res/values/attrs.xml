@@ -87,9 +87,9 @@
         <!--  Width of the panel. If not specified, will use default width value -->
         <attr name="panelWidthRes" format="reference"/>
         <!-- X Offset value for the panel location relative to the anchor view -->
-        <attr name="xOffset" format="integer"/>
+        <attr name="xOffset" format="dimension"/>
         <!-- Y Offset value for the panel location relative to the anchor view -->
-        <attr name="yOffset" format="integer"/>
+        <attr name="yOffset" format="dimension"/>
         <!-- Gravity of the panel relative to the anchor view - uses same flag format as android:gravity -->
         <attr name="gravity" format="integer">
             <flag name="top" value="0x30" />
@@ -154,17 +154,10 @@
         <attr name="layout" format="reference"/>
     </declare-styleable>
 
-    <declare-styleable name="DisplayAreaView">
-        <attr name="displayAreaFeatureId" format="integer" />
-        <attr name="launchTaskDisplayAreaFeatureId" format="integer" />
-        <attr name="cornerRadius" format="integer" />
-    </declare-styleable>
 
-    <attr name="carControlHighlight" format="color|reference"/>
     <attr name="systemBarPillRadius" format="dimension"/>
     <attr name="systemBarPillSelectedRadius" format="dimension"/>
     <attr name="appPanelBackgroundRadius" format="dimension"/>
-    <attr name="carVolumeItemCornerRadius" format="dimension"/>
     <attr name="notificationShadeHandleBarRadius" format="dimension"/>
     <attr name="notificationShadowRadius" format="dimension"/>
     <attr name="carStatusIconPanelBorderRadius" format="dimension"/>
